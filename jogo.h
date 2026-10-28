@@ -80,4 +80,17 @@ typedef struct {
     int terminou;
 } EstadoOrdenacao;
 
+/* Tudo o que muda durante uma partida. O main.c cria uma só
+   e passa o endereço dela para as funções dos módulos */
+typedef struct {
+    Sala *primeiraSala;              /* Bilheteria, início da lista circular */
+    Sala *salaJogador;               /* nó onde o jogador está */
+    Sala *salaCriatura;              /* nó onde a criatura está */
+    Fotograma *fotogramasColetados;  /* cabeça da lista simples, NULL se vazia */
+    int totalColetados;              /* de 0 a TOTAL_FOTOGRAMAS */
+    int ruidoAcumulado;              /* zera quando a criatura anda */
+    EstadoJogo estadoAtual;
+    EstadoOrdenacao ordenacao;
+} Partida;
+
 #endif
