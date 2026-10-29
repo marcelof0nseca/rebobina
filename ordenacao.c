@@ -1,16 +1,22 @@
 /*
  * ordenacao.c
  * Responsável: Luiz
- * CASCA: funções vazias só para o projeto compilar.
- * O Luiz substitui cada uma pela versão real.
+ * Estado e execução passo a passo dos algoritmos de ordenação.
+ * As funções de passo ainda estão em implementação.
  */
 #include "ordenacao.h"
 
-/* CASCA: prepara o estado para começar a ordenar do zero */
+/* Reinicia os contadores e define a posição inicial do algoritmo. */
 void iniciarOrdenacao(EstadoOrdenacao *estado, TipoAlgoritmo algoritmo)
 {
-    (void)estado;
-    (void)algoritmo;
+    if (estado == 0) {
+        return;
+    }
+
+    *estado = (EstadoOrdenacao){0};
+    estado->algoritmo = algoritmo;
+    estado->posicaoExterna = (algoritmo == ALGORITMO_INSERTION) ? 1 : 0;
+    estado->terminou = (algoritmo == ALGORITMO_NENHUM);
 }
 
 /* CASCA: executa um único passo do Bubble Sort */
