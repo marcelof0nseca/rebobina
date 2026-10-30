@@ -35,17 +35,16 @@ Fotograma *adicionarFotograma(Fotograma *cabeca, Fotograma *novo)
     atual->prox = novo;
     return cabeca;
 }
+
 /* Libera todos os nós da lista de fotogramas. */
-void liberarFotogramas(Fotograma *cabeca){
+void liberarFotogramas(Fotograma *cabeca)
+{
+    Fotograma *atual = cabeca;
 
-    Fotograma *aux = cabeca;
-
-    while(aux != NULL){
-        
-        Fotograma *proximo = aux -> prox;
-        free(aux);
-        aux = proximo;
-
+    while (atual != NULL) {
+        Fotograma *proximo = atual->prox;
+        free(atual);
+        atual = proximo;
     }
 }
 
@@ -62,21 +61,22 @@ Fotograma *removerFotograma(Fotograma *cabeca, int ordemCorreta)
         return novaCabeca;
     }
 
-    Fotograma *aux = cabeca;
+    Fotograma *anterior = cabeca;
 
     /* Para no nó anterior ao procurado ou no último nó. */
-    while (aux->prox != NULL && aux->prox->ordemCorreta != ordemCorreta) {
-        aux = aux->prox;
+    while (anterior->prox != NULL && anterior->prox->ordemCorreta != ordemCorreta) {
+        anterior = anterior->prox;
     }
 
-    if (aux->prox != NULL) {
-        Fotograma *removido = aux->prox;
-        aux->prox = removido->prox;
+    if (anterior->prox != NULL) {
+        Fotograma *removido = anterior->prox;
+        anterior->prox = removido->prox;
         free(removido);
     }
 
     return cabeca;
 }
+
 /* CASCA: confere se a lista está em ordem crescente de ordemCorreta */
 int estaOrdenado(const Fotograma *cabeca)
 {
