@@ -1,8 +1,7 @@
 /*
  * salas.c
  * Responsável: Marcelo
- * CASCA: funções vazias só para o projeto compilar.
- * A versão real da lista circular entra no PR 2.
+ * Lista circular duplamente encadeada das salas do cinema.
  */
 #include <stdlib.h>
 #include <string.h>
@@ -70,8 +69,23 @@ Sala *moverJogador(Sala *salaAtual, Direcao direcao)
     return salaAtual->ant;
 }
 
-/* CASCA: libera todas as salas e os fotogramas que estiverem no chão */
+/* Libera todas as salas e o fotograma que ainda estiver no chão de cada uma.
+   Recebe a primeira sala (pode ser NULL).
+   Não retorna nada. */
 void liberarSalas(Sala *primeiraSala)
 {
-    (void)primeiraSala;
+    if (primeiraSala == NULL) {
+        return;
+    }
+
+    /* Quebra o círculo: a última sala deixa de apontar para a primeira */
+    primeiraSala->ant->prox = NULL;
+
+    Sala *salaAtual = primeiraSala;
+    while (salaAtual != NULL) {
+        Sala *proximaSala = salaAtual->prox;
+        free(salaAtual->fotogramaNoChao);
+        free(salaAtual);
+        salaAtual = proximaSala;
+    }
 }
