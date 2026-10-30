@@ -29,10 +29,28 @@ Sala *criarSala(int indice, const char *nome, TipoCenario tipoCenario)
     return novaSala;
 }
 
-/* CASCA: insere novaSala no fim da lista circular */
+/* Insere novaSala no fim da lista circular.
+   Recebe a primeira sala (NULL se a lista está vazia) e a sala nova.
+   Retorna a primeira sala da lista. */
 Sala *inserirSala(Sala *primeiraSala, Sala *novaSala)
 {
-    (void)novaSala;
+    if (novaSala == NULL) {
+        return primeiraSala;
+    }
+
+    if (primeiraSala == NULL) {
+        novaSala->prox = novaSala;
+        novaSala->ant = novaSala;
+        return novaSala;
+    }
+
+    Sala *ultimaSala = primeiraSala->ant;
+
+    novaSala->prox = primeiraSala;
+    novaSala->ant = ultimaSala;
+    ultimaSala->prox = novaSala;
+    primeiraSala->ant = novaSala;
+
     return primeiraSala;
 }
 
