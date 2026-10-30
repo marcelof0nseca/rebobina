@@ -1,37 +1,91 @@
 /*
  * salas.c
  * Responsável: Marcelo
- * CASCA: funções vazias só para o projeto compilar.
- * A versão real da lista circular entra no PR 2.
+ * Lista circular duplamente encadeada das salas do cinema.
  */
 #include <stdlib.h>
+#include <string.h>
 #include "salas.h"
 
-/* CASCA: cria uma sala sozinha, com prox e ant apontando para ela mesma */
+/* Cria uma sala sozinha, com prox e ant apontando para ela mesma.
+   Recebe o índice, o nome e o tipo de cenário.
+   Retorna a sala criada, ou NULL se faltar memória. */
 Sala *criarSala(int indice, const char *nome, TipoCenario tipoCenario)
 {
-    (void)indice;
-    (void)nome;
-    (void)tipoCenario;
-    return NULL;
+    Sala *novaSala = malloc(sizeof(Sala));
+    if (novaSala == NULL) {
+        return NULL;
+    }
+
+    novaSala->indice = indice;
+    strncpy(novaSala->nome, nome, TAMANHO_NOME_SALA - 1);
+    novaSala->nome[TAMANHO_NOME_SALA - 1] = '\0';
+    novaSala->tipoCenario = tipoCenario;
+    novaSala->fotogramaNoChao = NULL;
+    novaSala->prox = novaSala;
+    novaSala->ant = novaSala;
+
+    return novaSala;
 }
 
-/* CASCA: insere novaSala no fim da lista circular */
+/* Insere novaSala no fim da lista circular.
+   Recebe a primeira sala (NULL se a lista está vazia) e a sala nova.
+   Retorna a primeira sala da lista. */
 Sala *inserirSala(Sala *primeiraSala, Sala *novaSala)
 {
-    (void)novaSala;
+    if (novaSala == NULL) {
+        return primeiraSala;
+    }
+
+    if (primeiraSala == NULL) {
+        novaSala->prox = novaSala;
+        novaSala->ant = novaSala;
+        return novaSala;
+    }
+
+    Sala *ultimaSala = primeiraSala->ant;
+
+    novaSala->prox = primeiraSala;
+    novaSala->ant = ultimaSala;
+    ultimaSala->prox = novaSala;
+    primeiraSala->ant = novaSala;
+
     return primeiraSala;
 }
 
-/* CASCA: anda uma sala na direção pedida */
+/* Anda uma sala na direção pedida.
+   Recebe a sala atual e a direção.
+   Retorna a sala vizinha naquela direção. */
 Sala *moverJogador(Sala *salaAtual, Direcao direcao)
 {
-    (void)direcao;
-    return salaAtual;
+    if (salaAtual == NULL) {
+        return NULL;
+    }
+
+    if (direcao == DIRECAO_DIREITA) {
+        return salaAtual->prox;
+    }
+
+    return salaAtual->ant;
 }
 
-/* CASCA: libera todas as salas e os fotogramas que estiverem no chão */
+/* Libera todas as salas e o fotograma que ainda estiver no chão de cada uma.
+   Recebe a primeira sala (pode ser NULL).
+   Não retorna nada. */
 void liberarSalas(Sala *primeiraSala)
 {
-    (void)primeiraSala;
+    if (primeiraSala == NULL) {
+        return;
+    }
+
+    /* Quebra o círculo: a última sala deixa de apontar para a primeira */
+    primeiraSala->ant->prox = NULL;
+
+    Sala *salaAtual = primeiraSala;
+    while (salaAtual != NULL) {
+        Sala *proximaSala = salaAtual->prox;
+        free(salaAtual->fotogramaNoChao);
+        free(salaAtual);
+        salaAtual = proximaSala;
+    }
 }
