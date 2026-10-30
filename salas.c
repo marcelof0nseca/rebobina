@@ -5,15 +5,28 @@
  * A versão real da lista circular entra no PR 2.
  */
 #include <stdlib.h>
+#include <string.h>
 #include "salas.h"
 
-/* CASCA: cria uma sala sozinha, com prox e ant apontando para ela mesma */
+/* Cria uma sala sozinha, com prox e ant apontando para ela mesma.
+   Recebe o índice, o nome e o tipo de cenário.
+   Retorna a sala criada, ou NULL se faltar memória. */
 Sala *criarSala(int indice, const char *nome, TipoCenario tipoCenario)
 {
-    (void)indice;
-    (void)nome;
-    (void)tipoCenario;
-    return NULL;
+    Sala *novaSala = malloc(sizeof(Sala));
+    if (novaSala == NULL) {
+        return NULL;
+    }
+
+    novaSala->indice = indice;
+    strncpy(novaSala->nome, nome, TAMANHO_NOME_SALA - 1);
+    novaSala->nome[TAMANHO_NOME_SALA - 1] = '\0';
+    novaSala->tipoCenario = tipoCenario;
+    novaSala->fotogramaNoChao = NULL;
+    novaSala->prox = novaSala;
+    novaSala->ant = novaSala;
+
+    return novaSala;
 }
 
 /* CASCA: insere novaSala no fim da lista circular */
