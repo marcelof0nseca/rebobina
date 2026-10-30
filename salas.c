@@ -54,11 +54,20 @@ Sala *inserirSala(Sala *primeiraSala, Sala *novaSala)
     return primeiraSala;
 }
 
-/* CASCA: anda uma sala na direção pedida */
+/* Anda uma sala na direção pedida.
+   Recebe a sala atual e a direção.
+   Retorna a sala vizinha naquela direção. */
 Sala *moverJogador(Sala *salaAtual, Direcao direcao)
 {
-    (void)direcao;
-    return salaAtual;
+    if (salaAtual == NULL) {
+        return NULL;
+    }
+
+    if (direcao == DIRECAO_DIREITA) {
+        return salaAtual->prox;
+    }
+
+    return salaAtual->ant;
 }
 
 /* CASCA: libera todas as salas e os fotogramas que estiverem no chão */
