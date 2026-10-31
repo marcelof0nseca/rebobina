@@ -3,7 +3,7 @@
  * Responsável: Lucca
  * Movimento da criatura pela lista circular de salas.
  */
-#include <stddef.h>
+#include <stdlib.h>
 #include "criatura.h"
 
 /* Calcula a menor distância entre duas salas, contando os passos por prox e por ant.
@@ -47,8 +47,38 @@ int distanciaCircular(const Sala *origem, const Sala *destino)
     return distanciaEsquerda;
 }
 
-/* CASCA: anda a criatura um nó no sentido mais curto até o jogador */
+/* Anda a criatura um nó no sentido mais curto até o jogador.
+   Ela mede a distância até o jogador a partir de cada vizinho (prox e ant)
+   e vai para o vizinho mais perto. No empate, sorteia um dos dois.
+   Recebe a partida. Não retorna nada. */
 void moverCriatura(Partida *partida)
 {
-    (void)partida;
+    if (partida == NULL || partida->salaCriatura == NULL || partida->salaJogador == NULL) {
+        return;
+    }
+
+    Sala *salaCriatura = partida->salaCriatura;
+    Sala *salaJogador = partida->salaJogador;
+
+    if (salaCriatura == salaJogador) {
+        return;
+    }
+
+    int distanciaPeloProx = distanciaCircular(salaCriatura->prox, salaJogador);
+    int distanciaPeloAnt = distanciaCircular(salaCriatura->ant, salaJogador);
+
+    /* Jogador fora da lista da criatura: não tem para onde ir */
+    if (distanciaPeloProx == -1) {
+        return;
+    }
+
+    if (distanciaPeloProx < distanciaPeloAnt) {
+        partida->salaCriatura = salaCriatura->prox;
+    } else if (distanciaPeloAnt < distanciaPeloProx) {
+        partida->salaCriatura = salaCriatura->ant;
+    } else if (rand() % 2 == 0) {
+        partida->salaCriatura = salaCriatura->prox;
+    } else {
+        partida->salaCriatura = salaCriatura->ant;
+    }
 }

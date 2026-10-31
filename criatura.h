@@ -16,7 +16,8 @@
 int distanciaCircular(const Sala *origem, const Sala *destino);
 
 /* Anda a criatura um nó no sentido mais curto até o jogador.
-   No empate entre os dois sentidos, sorteia um deles.
+   No empate entre os dois sentidos, sorteia um deles com rand();
+   o srand fica no main.c. Não mexe em ruído nem captura (isso é do regras.c).
    Recebe a partida. Não retorna nada. */
 void moverCriatura(Partida *partida);
 
