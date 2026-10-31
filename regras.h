@@ -8,6 +8,13 @@
 
 #include "jogo.h"
 
+/* Barulho de cada ação. Comparar e trocar vêm dos passos da ordenação.
+   Os limites de cada fase ficam no jogo.h. Valores iniciais, ajustados no equilíbrio */
+#define RUIDO_ANDAR    1
+#define RUIDO_COLETAR  2
+#define RUIDO_COMPARAR 1
+#define RUIDO_TROCAR   2
+
 /* Soma o barulho de uma ação. Quando o total passa do limite,
    a criatura anda uma sala e o ruído acumulado volta a zero.
    Recebe a partida, o barulho da ação e o limite da fase atual.
