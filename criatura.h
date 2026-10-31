@@ -9,8 +9,10 @@
 #include "jogo.h"
 
 /* Calcula a menor distância entre duas salas, contando os passos por prox e por ant.
+   Funciona com qualquer lista circular: não usa o campo indice nem TOTAL_SALAS.
    Recebe a sala de origem e a de destino.
-   Retorna o menor número de passos (0 se forem a mesma sala). */
+   Retorna o menor número de passos (0 se forem a mesma sala),
+   ou -1 se alguma for NULL ou se o destino não estiver na lista da origem. */
 int distanciaCircular(const Sala *origem, const Sala *destino);
 
 /* Anda a criatura um nó no sentido mais curto até o jogador.
