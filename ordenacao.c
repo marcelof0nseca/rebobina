@@ -5,11 +5,12 @@
  * As funções de passo ainda estão em implementação.
  */
 #include "ordenacao.h"
+#include <stddef.h>
 
 /* Reinicia os contadores e define a posição inicial do algoritmo. */
 void iniciarOrdenacao(EstadoOrdenacao *estado, TipoAlgoritmo algoritmo)
 {
-    if (estado == 0) {
+    if (estado == NULL) {
         return;
     }
 
