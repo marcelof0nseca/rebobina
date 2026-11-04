@@ -30,12 +30,26 @@
 #define TABUAS_DO_CHAO 8
 #define MANCHAS_DE_NEVOA 7
 
+/* Fotograma caído no chão: posição na tela e profundidade da camada */
+#define POS_FOTOGRAMA_X 480
+#define POS_FOTOGRAMA_Y 430
+#define PROFUNDIDADE_FOTOGRAMA 0.6f
+
+#define FILEIRAS_DE_POLTRONAS 4
+#define CARTAZES_DO_CORREDOR 3
+
 /* Paleta do cenário */
 #define COR_TETO        GetColor(0x0f0d0bff)
 #define COR_PAREDE_LADO GetColor(0x29211bff)
 #define COR_RODAPE      GetColor(0x3a2a20ff)
 #define COR_MOLDURA     GetColor(0x4a382bff)
 #define COR_VAO_PORTA   GetColor(0x060505ff)
+#define COR_VINHO       GetColor(0x4a1013ff)
+#define COR_DOBRA       GetColor(0x2c090bff)
+#define COR_MADEIRA     GetColor(0x241a14ff)
+#define COR_LAMPADA     GetColor(0xd8c89aff)
+#define COR_FEIXE       GetColor(0xffe6aaff)
+#define COR_METAL       GetColor(0x4b5450ff)
 
 /* Mistura dois números; fracao = 0 devolve o primeiro, 1 devolve o segundo.
    Recebe o início, o fim e a fração. Retorna o valor misturado. */
@@ -201,6 +215,190 @@ static void desenharNevoa(float tempo, Vista vista)
     }
 }
 
+/* Sala de exibição: tela tremulando, cortinas e fileiras de poltronas.
+   Recebe o tempo de jogo e a vista. Não retorna nada. */
+static void desenharSalaDeExibicao(float tempo, Vista vista)
+{
+    float tremulacao = 0.75f + 0.25f * sinf(tempo * 23.0f) * sinf(tempo * 7.1f);
+
+    comecarCamada(vista, 1);
+    DrawRectangle(272, 124, 416, 182, GetColor(0x0a0908ff));
+    DrawRectangleGradientV(280, 130, 400, 170,
+                           ColorAlpha(GetColor(0xd6cebaff), 0.55f * tremulacao),
+                           ColorAlpha(GetColor(0xa09682ff), 0.40f * tremulacao));
+
+    /* De vez em quando uma silhueta aparece na tela por meio segundo */
+    if (fmodf(tempo, 9.0f) < 0.5f) {
+        Color sombra = { 10, 8, 8, 190 };
+        DrawEllipse(480, 196, 18, 24, sombra);
+        DrawRectangle(458, 218, 44, 82, sombra);
+    }
+
+    DrawRectangle(250, 118, 26, 212, COR_VINHO);
+    DrawRectangle(684, 118, 26, 212, COR_VINHO);
+    for (int dobra = 0; dobra < 3; dobra++) {
+        DrawLine(256 + dobra * 7, 118, 256 + dobra * 7, 330, COR_DOBRA);
+        DrawLine(690 + dobra * 7, 118, 690 + dobra * 7, 330, COR_DOBRA);
+    }
+    terminarCamada();
+
+    /* Cada fileira fica numa profundidade: a do fundo se move pouco,
+       a mais perto da câmera se move mais */
+    for (int fileira = 0; fileira < FILEIRAS_DE_POLTRONAS; fileira++) {
+        float alturaNaTela = 392 + fileira * 40.0f;
+        float metadeDaLargura = 230 + fileira * 70.0f;
+        int quantidade = 9 + fileira * 2;
+        float larguraPoltrona = metadeDaLargura * 2 / quantidade;
+        float profundidade = (ALTURA_VIRTUAL - alturaNaTela) / (ALTURA_VIRTUAL - FUNDO_BASE);
+
+        comecarCamada(vista, profundidade);
+        for (int poltrona = 0; poltrona < quantidade; poltrona++) {
+            float posicaoX = 480 - metadeDaLargura + poltrona * larguraPoltrona;
+            DrawRectangleRounded((Rectangle){ posicaoX + 2, alturaNaTela, larguraPoltrona - 4, 30 + fileira * 4.0f },
+                                 0.3f, 4, GetColor(0x3d1012ff));
+            DrawRectangleRounded((Rectangle){ posicaoX + 2, alturaNaTela, larguraPoltrona - 4, 6 },
+                                 0.5f, 4, GetColor(0x5a191cff));
+        }
+        terminarCamada();
+    }
+}
+
+/* Diz se a lâmpada do corredor está acesa neste instante (ela falha às vezes).
+   Depende só do tempo, para o desenho e a luz do shader sempre concordarem.
+   Recebe o tempo de jogo. Retorna true se está acesa. */
+static bool lampadaAcesa(float tempo)
+{
+    return sinf(tempo * 13.0f) > -0.6f || sinf(tempo * 3.1f) > 0.9f;
+}
+
+/* Lâmpada pendurada do teto, falhando. Usada no corredor e no saguão.
+   Recebe o tempo de jogo e a vista. Não retorna nada. */
+static void desenharLampadaPendurada(float tempo, Vista vista)
+{
+    comecarCamada(vista, 0.9f);
+    DrawRectangle(476, -40, 8, 106, GetColor(0x2a2420ff));
+    if (lampadaAcesa(tempo)) {
+        BeginBlendMode(BLEND_ADDITIVE);
+        desenharCirculoDegrade((Vector2){ 480, 74 }, 70, ColorAlpha(COR_LAMPADA, 0.35f), BLANK);
+        EndBlendMode();
+        DrawCircle(480, 74, 12, COR_LAMPADA);
+    } else {
+        DrawCircle(480, 74, 12, GetColor(0x3a332aff));
+    }
+    terminarCamada();
+}
+
+/* Desenha um cartaz de filme na parede do fundo, com o título embaixo.
+   Recebe o centro do cartaz, o título e a cor de fundo. Não retorna nada. */
+static void desenharCartaz(int centroX, const char *titulo, Color corDeFundo)
+{
+    int largura = 100;   /* largo o bastante para o título caber */
+    int altura = 104;
+    int esquerda = centroX - largura / 2;
+
+    DrawRectangle(esquerda - 4, 142, largura + 8, altura + 8, GetColor(0x4a3524ff));
+    DrawRectangle(esquerda, 146, largura, altura, corDeFundo);
+    DrawCircle(centroX, 184, 15, (Color){ 0, 0, 0, 115 });
+    DrawRectangle(centroX - 13, 197, 26, 24, (Color){ 0, 0, 0, 115 });
+
+    int larguraTexto = MeasureText(titulo, 10);
+    DrawText(titulo, centroX - larguraTexto / 2, 230, 10, ColorAlpha(COR_CREME, 0.6f));
+}
+
+/* Corredor: três cartazes, lâmpada pendurada falhando e um banco.
+   Recebe o tempo de jogo e a vista. Não retorna nada. */
+static void desenharCorredor(float tempo, Vista vista)
+{
+    const char *titulos[CARTAZES_DO_CORREDOR] = { "O ÚLTIMO ROLO", "REBOBINA", "NÃO OLHE" };
+    Color fundos[CARTAZES_DO_CORREDOR] = { GetColor(0x3a1517ff), GetColor(0x1f2a2aff), GetColor(0x2e2416ff) };
+    int centros[CARTAZES_DO_CORREDOR] = { 318, 480, 642 };
+
+    comecarCamada(vista, 1);
+    for (int cartaz = 0; cartaz < CARTAZES_DO_CORREDOR; cartaz++) {
+        desenharCartaz(centros[cartaz], titulos[cartaz], fundos[cartaz]);
+    }
+    DrawRectangle(330, 300, 300, 18, COR_MADEIRA);
+    DrawRectangle(345, 318, 12, 40, COR_MADEIRA);
+    DrawRectangle(603, 318, 12, 40, COR_MADEIRA);
+    terminarCamada();
+
+    desenharLampadaPendurada(tempo, vista);
+}
+
+/* Cabine de projeção: janela para a sala, feixe de luz, projetor e bobinas girando.
+   Recebe o tempo de jogo e a vista. Não retorna nada. */
+static void desenharCabine(float tempo, Vista vista)
+{
+    float pulso = 0.6f + 0.4f * fabsf(sinf(tempo * 19.0f));
+    Vector2 noFundo = deslocamentoNaProfundidade(vista, 1);
+    Vector2 noProjetor = deslocamentoNaProfundidade(vista, 0.75f);
+
+    comecarCamada(vista, 1);
+    DrawRectangle(400, 160, 160, 70, GetColor(0x050505ff));
+    DrawRectangle(404, 164, 152, 62, ColorAlpha(COR_AMBAR, 0.25f * pulso));
+    terminarCamada();
+
+    /* O feixe liga o projetor (mais perto) à janela (no fundo):
+       cada ponta se desloca com a sua própria profundidade */
+    BeginBlendMode(BLEND_ADDITIVE);
+    Color feixe = ColorAlpha(COR_FEIXE, 0.22f * pulso);
+    desenharQuadrilatero((Vector2){ 612 + noProjetor.x, 246 + noProjetor.y },
+                         (Vector2){ 470 + noFundo.x, 168 + noFundo.y },
+                         (Vector2){ 470 + noFundo.x, 222 + noFundo.y },
+                         (Vector2){ 612 + noProjetor.x, 262 + noProjetor.y }, feixe);
+    EndBlendMode();
+
+    comecarCamada(vista, 0.75f);
+    DrawRectangle(600, 230, 130, 90, GetColor(0x1f2422ff));
+    DrawRectangle(600, 230, 130, 14, GetColor(0x2e3532ff));
+    DrawCircle(604, 254, 16, GetColor(0x0c0e0dff));
+    DrawCircle(604, 254, 8, ColorAlpha(COR_FEIXE, 0.8f * pulso));
+    DrawRectangle(650, 320, 30, 70, GetColor(0x14171aff));
+
+    Vector2 bobinas[2] = { { 630, 190 }, { 710, 190 } };
+    for (int bobina = 0; bobina < 2; bobina++) {
+        float giro = tempo * (bobina == 0 ? -1.4f : 1.4f);
+        DrawRing(bobinas[bobina], 30, 35, 0, 360, 40, COR_METAL);
+        for (int raio = 0; raio < 3; raio++) {
+            float angulo = giro + raio * 2.094f;   /* 2,094 rad = 120 graus */
+            Vector2 ponta = { bobinas[bobina].x + cosf(angulo) * 30, bobinas[bobina].y + sinf(angulo) * 30 };
+            DrawLineEx(bobinas[bobina], ponta, 4, COR_METAL);
+        }
+    }
+    terminarCamada();
+
+    comecarCamada(vista, 0.6f);
+    DrawRectangle(250, 330, 300, 22, GetColor(0x2b1f17ff));
+    DrawRectangle(262, 352, 16, 80, GetColor(0x1b140fff));
+    DrawRectangle(522, 352, 16, 80, GetColor(0x1b140fff));
+    terminarCamada();
+}
+
+/* Fotograma caído no chão, com brilho âmbar pulsando.
+   Recebe o tempo de jogo e a vista. Não retorna nada. */
+static void desenharFotogramaNoChao(float tempo, Vista vista)
+{
+    int centroY = (int)(POS_FOTOGRAMA_Y + sinf(tempo * 2.2f) * 4);
+    Color corDoFilme = GetColor(0x16110cff);
+
+    comecarCamada(vista, PROFUNDIDADE_FOTOGRAMA);
+    BeginBlendMode(BLEND_ADDITIVE);
+    desenharCirculoDegrade((Vector2){ POS_FOTOGRAMA_X, (float)centroY }, 90, ColorAlpha(COR_AMBAR, 0.35f), BLANK);
+    EndBlendMode();
+
+    DrawRectangle(POS_FOTOGRAMA_X - 46, centroY - 34, 92, 68, corDoFilme);
+    DrawRectangle(POS_FOTOGRAMA_X - 32, centroY - 24, 64, 48, ColorAlpha(COR_AMBAR, 0.9f));
+    /* Furos da película dos dois lados */
+    for (int furo = -28; furo <= 28; furo += 12) {
+        DrawRectangle(POS_FOTOGRAMA_X - 43, centroY + furo - 3, 7, 6, corDoFilme);
+        DrawRectangle(POS_FOTOGRAMA_X + 36, centroY + furo - 3, 7, 6, corDoFilme);
+    }
+    /* Silhueta de alguém dentro do quadro */
+    DrawEllipse(POS_FOTOGRAMA_X, centroY - 4, 8, 10, (Color){ 30, 20, 10, 180 });
+    DrawRectangle(POS_FOTOGRAMA_X - 10, centroY + 6, 20, 18, (Color){ 30, 20, 10, 180 });
+    terminarCamada();
+}
+
 /* Calcula a vista a partir de para onde o jogador olha, somando o balanço
    de quem segura a filmadora e o tremor quando a criatura está perto.
    Recebe para onde olha (de -1 a 1 em cada eixo), o tempo de jogo
@@ -236,12 +434,30 @@ void desenharSala(const Partida *partida, const Recursos *recursos, Vista vista,
 {
     (void)recursos;   /* as imagens PNG do Vinicius entram aqui no futuro */
 
-    if (partida->salaJogador == NULL) {
+    const Sala *sala = partida->salaJogador;
+    if (sala == NULL) {
         return;
     }
 
     desenharParedesEChao(vista);
+
+    /* O desenho vem do nó da lista circular em que o jogador está */
+    switch (sala->tipoCenario) {
+        case CENARIO_EXIBICAO: desenharSalaDeExibicao(tempo, vista); break;
+        case CENARIO_CORREDOR: desenharCorredor(tempo, vista); break;
+        case CENARIO_CABINE:   desenharCabine(tempo, vista); break;
+        case CENARIO_BILHETERIA:
+        case CENARIO_BOMBONIERE:
+        case CENARIO_SAGUAO:
+        case CENARIO_BANHEIRO:
+            break;   /* desenhados nos próximos commits */
+    }
+
     desenharNevoa(tempo, vista);
+
+    if (sala->fotogramaNoChao != NULL) {
+        desenharFotogramaNoChao(tempo, vista);
+    }
 }
 
 /* CASCA: desenha o vulto na porta quando a criatura está a uma sala */
