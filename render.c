@@ -50,6 +50,14 @@
 #define COR_LAMPADA     GetColor(0xd8c89aff)
 #define COR_FEIXE       GetColor(0xffe6aaff)
 #define COR_METAL       GetColor(0x4b5450ff)
+#define COR_NEON_APAGADO GetColor(0x3a1416ff)
+#define COR_AMBAR_APAGADO GetColor(0x3a2b14ff)
+#define COR_VIDRO       GetColor(0x0b1214ff)
+#define COR_BALCAO      GetColor(0x3a2618ff)
+#define COR_BALCAO_TAMPO GetColor(0x553a24ff)
+
+#define PROFUNDIDADE_BALCAO 0.55f
+#define PIPOCAS_NA_VITRINE 70
 
 /* Mistura dois números; fracao = 0 devolve o primeiro, 1 devolve o segundo.
    Recebe o início, o fim e a fração. Retorna o valor misturado. */
@@ -374,6 +382,123 @@ static void desenharCabine(float tempo, Vista vista)
     terminarCamada();
 }
 
+/* Diz se o neon da bilheteria está aceso. Ele pisca de vez em quando,
+   em rajadas rápidas. Depende só do tempo, como a lâmpada do corredor.
+   Recebe o tempo de jogo. Retorna true se está aceso. */
+static bool neonBilheteriaAceso(float tempo)
+{
+    bool emRajada = fmodf(tempo, 5.3f) < 0.4f;
+    return !(emRajada && sinf(tempo * 40.0f) > 0.0f);
+}
+
+/* Diz se o letreiro da bombonière está aceso. Ele falha mais que o neon:
+   apaga em rajadas curtas a cada poucos segundos.
+   Recebe o tempo de jogo. Retorna true se está aceso. */
+static bool letreiroBomboniereAceso(float tempo)
+{
+    bool emRajada = fmodf(tempo, 3.7f) < 0.6f;
+    return !(emRajada && sinf(tempo * 55.0f) > 0.2f);
+}
+
+/* Escreve um letreiro luminoso centralizado: aceso, tem um halo em volta
+   do texto; apagado, mostra só os tubos escuros.
+   Recebe o texto, o centro, o tamanho, a cor acesa, a cor apagada e se está aceso.
+   Não retorna nada. */
+static void desenharLetreiro(const char *texto, int centroX, int topo, int tamanho,
+                             Color corAcesa, Color corApagada, bool aceso)
+{
+    int esquerda = centroX - MeasureText(texto, tamanho) / 2;
+
+    if (!aceso) {
+        DrawText(texto, esquerda, topo, tamanho, corApagada);
+        return;
+    }
+
+    /* Halo: o mesmo texto deslocado em volta, quase transparente e somado à cena */
+    BeginBlendMode(BLEND_ADDITIVE);
+    for (int deslocamento = -2; deslocamento <= 2; deslocamento += 2) {
+        DrawText(texto, esquerda + deslocamento, topo, tamanho, ColorAlpha(corAcesa, 0.25f));
+        DrawText(texto, esquerda, topo + deslocamento, tamanho, ColorAlpha(corAcesa, 0.25f));
+    }
+    EndBlendMode();
+    DrawText(texto, esquerda, topo, tamanho, corAcesa);
+}
+
+/* Balcão de madeira na frente da sala, mais perto da câmera que a parede do fundo.
+   Usado na bilheteria e na bombonière.
+   Recebe a vista. Não retorna nada. */
+static void desenharBalcao(Vista vista)
+{
+    comecarCamada(vista, PROFUNDIDADE_BALCAO);
+    DrawRectangle(200, 336, 560, 22, COR_BALCAO_TAMPO);
+    DrawRectangle(206, 358, 548, 78, COR_BALCAO);
+    for (int tabua = 1; tabua < 8; tabua++) {
+        DrawLine(206 + tabua * 68, 358, 206 + tabua * 68, 436, (Color){ 0, 0, 0, 90 });
+    }
+    terminarCamada();
+}
+
+/* Bilheteria: letreiro em neon vermelho piscando, guichê de vidro escuro
+   com grades verticais e o balcão na frente.
+   Recebe o tempo de jogo e a vista. Não retorna nada. */
+static void desenharBilheteria(float tempo, Vista vista)
+{
+    comecarCamada(vista, 1);
+    desenharLetreiro("BILHETERIA", 480, 124, 34, COR_SANGUE, COR_NEON_APAGADO, neonBilheteriaAceso(tempo));
+
+    /* Guichê: moldura, vidro escuro com um reflexo e as grades */
+    DrawRectangle(352, 172, 256, 140, COR_MOLDURA);
+    DrawRectangleGradientV(360, 180, 240, 124, COR_VIDRO, GetColor(0x182226ff));
+    DrawTriangle((Vector2){ 380, 180 }, (Vector2){ 360, 230 }, (Vector2){ 420, 180 }, (Color){ 255, 255, 255, 18 });
+    for (int grade = 1; grade < 12; grade++) {
+        DrawRectangle(360 + grade * 20, 180, 3, 124, GetColor(0x1c1a18ff));
+    }
+    DrawCircleLines(480, 290, 9, GetColor(0x2a2a28ff));   /* furo para falar */
+    terminarCamada();
+
+    desenharBalcao(vista);
+}
+
+/* Bombonière: letreiro âmbar falhando, vitrine de pipoca iluminada,
+   prateleiras de doces e o balcão.
+   Recebe o tempo de jogo e a vista. Não retorna nada. */
+static void desenharBomboniere(float tempo, Vista vista)
+{
+    comecarCamada(vista, 1);
+    desenharLetreiro("BOMBONIERE", 480, 124, 34, COR_AMBAR, COR_AMBAR_APAGADO, letreiroBomboniereAceso(tempo));
+
+    /* Vitrine de pipoca: caixa de vidro com luz quente por dentro */
+    DrawRectangle(292, 182, 186, 146, COR_MOLDURA);
+    DrawRectangleGradientV(300, 190, 170, 130, ColorAlpha(COR_AMBAR, 0.30f), ColorAlpha(COR_AMBAR, 0.55f));
+    /* Pipocas empilhadas em fileiras desencontradas, cada fileira mais curta que a de baixo.
+       As posições são calculadas, e não sorteadas, para não tremerem a cada quadro */
+    for (int pipoca = 0; pipoca < PIPOCAS_NA_VITRINE; pipoca++) {
+        int fileira = pipoca / 14;
+        int coluna = pipoca % 14;
+        if (coluna < fileira || coluna > 13 - fileira) {
+            continue;   /* as pontas das fileiras de cima ficam vazias: vira um montinho */
+        }
+        float desencontro = (fileira % 2) * 5.0f + (float)((coluna * 7 + fileira * 13) % 5);
+        float posicaoX = 312 + coluna * 11 + desencontro;
+        float posicaoY = 314 - fileira * 9 - (float)((coluna * 3 + fileira) % 4);
+        DrawCircleV((Vector2){ posicaoX, posicaoY }, 4.0f, GetColor(0xf3e6c4ff));
+    }
+    DrawText("PIPOCA", 385 - MeasureText("PIPOCA", 10) / 2, 196, 10, ColorAlpha(GetColor(0x2a1a0aff), 0.8f));
+
+    /* Prateleiras com caixas de doces de cores diferentes */
+    Color doces[4] = { GetColor(0x5a1a1cff), GetColor(0x1f3a2aff), GetColor(0x3a2a5aff), GetColor(0x5a4a1aff) };
+    for (int prateleira = 0; prateleira < 3; prateleira++) {
+        int alturaNaParede = 210 + prateleira * 46;
+        DrawRectangle(508, alturaNaParede, 184, 6, COR_MADEIRA);
+        for (int caixa = 0; caixa < 6; caixa++) {
+            DrawRectangle(514 + caixa * 29, alturaNaParede - 22, 22, 22, doces[(caixa + prateleira) % 4]);
+        }
+    }
+    terminarCamada();
+
+    desenharBalcao(vista);
+}
+
 /* Fotograma caído no chão, com brilho âmbar pulsando.
    Recebe o tempo de jogo e a vista. Não retorna nada. */
 static void desenharFotogramaNoChao(float tempo, Vista vista)
@@ -446,8 +571,8 @@ void desenharSala(const Partida *partida, const Recursos *recursos, Vista vista,
         case CENARIO_EXIBICAO: desenharSalaDeExibicao(tempo, vista); break;
         case CENARIO_CORREDOR: desenharCorredor(tempo, vista); break;
         case CENARIO_CABINE:   desenharCabine(tempo, vista); break;
-        case CENARIO_BILHETERIA:
-        case CENARIO_BOMBONIERE:
+        case CENARIO_BILHETERIA: desenharBilheteria(tempo, vista); break;
+        case CENARIO_BOMBONIERE: desenharBomboniere(tempo, vista); break;
         case CENARIO_SAGUAO:
         case CENARIO_BANHEIRO:
             break;   /* desenhados nos próximos commits */
