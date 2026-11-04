@@ -25,6 +25,26 @@ typedef struct {
     bool salaJaTrocada;
 } TransicaoFita;
 
+/* Sinais de que a criatura está perto. Nada aparece escrito na tela:
+   o jogador percebe pela câmera, pela lanterna e pela fita */
+typedef struct {
+    float tremorCamera;         /* 0 = parada, 1 = tremendo muito */
+    float interferenciaFita;    /* 0 = fita limpa, 1 = muitos rasgos */
+    int chanceFalhaPorMil;      /* chance, por quadro, de a lanterna piscar */
+} SinaisCriatura;
+
+/* Guarda até quando a lanterna fica fraca numa piscada */
+typedef struct {
+    float fimDaPiscada;
+} FalhaLanterna;
+
+/* Alinhamento do texto em relação à posição pedida */
+typedef enum {
+    ALINHAR_ESQUERDA,
+    ALINHAR_CENTRO,
+    ALINHAR_DIREITA
+} AlinhamentoTexto;
+
 /* Um grão de poeira flutuando no ar. Só aparece dentro da luz da lanterna */
 typedef struct {
     Vector2 posicao;
@@ -127,5 +147,30 @@ int fitaEstaTrocando(const TransicaoFita *transicao);
    Recebe os efeitos, o tempo de jogo, o tremor (0 = calmo, 1 = máximo)
    e a transição de sala. Não retorna nada. */
 void aplicarEfeitoVHS(Efeitos *efeitos, float tempo, float tremor, const TransicaoFita *transicao);
+
+/* Traduz a distância da criatura em sinais: quanto mais perto, mais forte.
+   Recebe a distância em salas (da distanciaCircular; -1 se desconhecida).
+   Retorna os sinais para a câmera, a fita e a lanterna. */
+SinaisCriatura calcularSinaisCriatura(int distancia);
+
+/* Sorteia se a lanterna começa a piscar neste quadro.
+   Recebe a falha (onde fica o fim da piscada), o tempo de jogo
+   e a chance por mil vinda dos sinais da criatura.
+   Retorna a intensidade da lanterna: 1 = normal, 0.3 = piscando. */
+float atualizarFalhaLanterna(FalhaLanterna *falha, float tempo, int chanceFalhaPorMil);
+
+/* Desenha os olhos vermelhos da criatura, depois da lanterna.
+   No escuro eles brilham fraco; dentro da luz da lanterna, brilham forte.
+   A cada 4 segundos a criatura pisca.
+   Recebe a posição e o tamanho dos olhos, o tempo de jogo e o centro
+   e o raio da lanterna. Não retorna nada. */
+void desenharOlhosCriatura(Vector2 posicao, float tamanho, float tempo,
+                           Vector2 posicaoLuz, float raioLuz);
+
+/* Escreve um texto com as cores levemente separadas, como numa fita gasta.
+   Recebe a fonte, o texto, a posição, o tamanho, a cor e o alinhamento.
+   Não retorna nada. */
+void desenharTextoVHS(Font fonte, const char *texto, Vector2 posicao, float tamanho,
+                      Color cor, AlinhamentoTexto alinhamento);
 
 #endif

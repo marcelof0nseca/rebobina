@@ -11,6 +11,14 @@
 #define CAMINHO_SHADER_VHS      "shaders/vhs.fs"
 #define CAMINHO_FONTE           "assets/fontes/VT323-Regular.ttf"
 
+/* Cores dos olhos da criatura e da separação de cores do texto */
+#define COR_OLHO           GetColor(0xff3b44ff)
+#define COR_BRILHO_OLHO    GetColor(0xd0262fff)
+#define COR_SEPARACAO_AZUL (Color){ 80, 200, 220, 80 }
+
+/* Intensidade da lanterna no meio de uma piscada */
+#define INTENSIDADE_PISCANDO 0.3f
+
 /* A fonte é carregada com os códigos 32 a 255, que incluem as letras acentuadas */
 #define PRIMEIRO_CODIGO_FONTE 32
 #define QUANTIDADE_CODIGOS_FONTE 224
@@ -351,4 +359,116 @@ void aplicarEfeitoVHS(Efeitos *efeitos, float tempo, float tremor, const Transic
     BeginShaderMode(efeitos->vhs);
     desenharFolha(efeitos->quadro);
     EndShaderMode();
+}
+
+/* Traduz a distância da criatura em sinais: quanto mais perto, mais forte.
+   Recebe a distância em salas (da distanciaCircular; -1 se desconhecida).
+   Retorna os sinais para a câmera, a fita e a lanterna. */
+SinaisCriatura calcularSinaisCriatura(int distancia)
+{
+    SinaisCriatura sinais = { 0.0f, 0.0f, 6 };   /* longe ou desconhecida */
+
+    if (distancia == 0) {
+        sinais.tremorCamera = 1.0f;
+        sinais.interferenciaFita = 1.0f;
+        sinais.chanceFalhaPorMil = 60;
+    } else if (distancia == 1) {
+        sinais.tremorCamera = 0.5f;
+        sinais.interferenciaFita = 1.0f;
+        sinais.chanceFalhaPorMil = 30;
+    } else if (distancia == 2) {
+        sinais.interferenciaFita = 0.4f;
+        sinais.chanceFalhaPorMil = 14;
+    }
+
+    return sinais;
+}
+
+/* Sorteia se a lanterna começa a piscar neste quadro.
+   Recebe a falha (onde fica o fim da piscada), o tempo de jogo
+   e a chance por mil vinda dos sinais da criatura.
+   Retorna a intensidade da lanterna: 1 = normal, 0.3 = piscando. */
+float atualizarFalhaLanterna(FalhaLanterna *falha, float tempo, int chanceFalhaPorMil)
+{
+    /* Uma piscada nova só começa quando a anterior terminou;
+       ela dura entre 0,08 e 0,22 segundo */
+    if (tempo > falha->fimDaPiscada && GetRandomValue(0, 999) < chanceFalhaPorMil) {
+        falha->fimDaPiscada = tempo + 0.08f + GetRandomValue(0, 140) / 1000.0f;
+    }
+
+    if (tempo < falha->fimDaPiscada) {
+        return INTENSIDADE_PISCANDO;
+    }
+    return 1.0f;
+}
+
+/* Diz quanto um ponto está iluminado pela lanterna, do mesmo jeito que o shader:
+   1 perto do centro, caindo até 0 na borda do raio.
+   Recebe o ponto, o centro e o raio da lanterna. Retorna um valor de 0 a 1. */
+static float iluminacaoDaLanterna(Vector2 ponto, Vector2 posicaoLuz, float raioLuz)
+{
+    if (raioLuz <= 0) {
+        return 0.0f;
+    }
+
+    float distancia = hypotf(ponto.x - posicaoLuz.x, ponto.y - posicaoLuz.y);
+    float inicio = raioLuz * 0.35f;
+    if (distancia <= inicio) {
+        return 1.0f;
+    }
+    if (distancia >= raioLuz) {
+        return 0.0f;
+    }
+
+    /* smoothstep: transição suave entre o começo e o fim da borda */
+    float fracao = (distancia - inicio) / (raioLuz - inicio);
+    return 1.0f - fracao * fracao * (3.0f - 2.0f * fracao);
+}
+
+/* Desenha os olhos vermelhos da criatura, depois da lanterna.
+   No escuro eles brilham fraco; dentro da luz da lanterna, brilham forte.
+   A cada 4 segundos a criatura pisca.
+   Recebe a posição e o tamanho dos olhos, o tempo de jogo e o centro
+   e o raio da lanterna. Não retorna nada. */
+void desenharOlhosCriatura(Vector2 posicao, float tamanho, float tempo,
+                           Vector2 posicaoLuz, float raioLuz)
+{
+    if (fmodf(tempo, 4.0f) < 0.12f) {
+        return;
+    }
+
+    /* No escuro sobra só um quinto do brilho: dá para notar, mas não salta aos olhos */
+    float brilho = 0.2f + 0.8f * iluminacaoDaLanterna(posicao, posicaoLuz, raioLuz);
+
+    for (int lado = -1; lado <= 1; lado += 2) {
+        Vector2 olho = { posicao.x + lado * tamanho * 1.6f, posicao.y };
+
+        BeginBlendMode(BLEND_ADDITIVE);
+        desenharCirculoDegrade(olho, tamanho * 5, ColorAlpha(COR_BRILHO_OLHO, 0.55f * brilho), BLANK);
+        EndBlendMode();
+
+        DrawEllipse((int)olho.x, (int)olho.y, tamanho, tamanho * 0.55f, ColorAlpha(COR_OLHO, brilho));
+    }
+}
+
+/* Escreve um texto com as cores levemente separadas, como numa fita gasta.
+   Recebe a fonte, o texto, a posição, o tamanho, a cor e o alinhamento.
+   Não retorna nada. */
+void desenharTextoVHS(Font fonte, const char *texto, Vector2 posicao, float tamanho,
+                      Color cor, AlinhamentoTexto alinhamento)
+{
+    float espacamento = tamanho / 10.0f;
+    Vector2 medida = MeasureTextEx(fonte, texto, tamanho, espacamento);
+    if (alinhamento == ALINHAR_CENTRO) {
+        posicao.x -= medida.x / 2;
+    } else if (alinhamento == ALINHAR_DIREITA) {
+        posicao.x -= medida.x;
+    }
+
+    /* Uma cópia vermelha à direita e uma azul à esquerda, por baixo do texto */
+    DrawTextEx(fonte, texto, (Vector2){ posicao.x + 1.5f, posicao.y }, tamanho, espacamento,
+               ColorAlpha(COR_BRILHO_OLHO, 0.55f));
+    DrawTextEx(fonte, texto, (Vector2){ posicao.x - 1.5f, posicao.y }, tamanho, espacamento,
+               COR_SEPARACAO_AZUL);
+    DrawTextEx(fonte, texto, posicao, tamanho, espacamento, cor);
 }
