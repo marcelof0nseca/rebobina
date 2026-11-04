@@ -15,6 +15,8 @@
 #include "efeitos.h"
 #include "render.h"
 #include "recursos.h"
+#include "regras.h"
+#include "menu.h"
 
 #define RAIO_LANTERNA 230.0f
 #define SUAVIDADE_LANTERNA 0.12f   /* quanto a lanterna anda até o mouse por quadro */
@@ -37,12 +39,62 @@ static void atualizarLanterna(EstadoDaLanterna *lanterna, float tempo, SinaisCri
     lanterna->intensidade = atualizarFalhaLanterna(&lanterna->falha, tempo, sinais.chanceFalhaPorMil);
 }
 
-/* Desenha um quadro inteiro nas três folhas e depois na janela.
-   Recebe os efeitos, a lanterna, o tempo de jogo, os sinais da criatura
-   e a transição de sala. Não retorna nada. */
-static void desenharQuadro(Efeitos *efeitos, const EstadoDaLanterna *lanterna, float tempo,
-                           SinaisCriatura sinais, const TransicaoFita *transicao)
+/* Diz se o estado é de partida em andamento (explorando ou montando o filme).
+   Recebe o estado. Retorna 1 se é de partida, 0 se é uma tela do menu. */
+static int estaEmPartida(EstadoJogo estado)
 {
+    return estado == ESTADO_JOGANDO || estado == ESTADO_MONTAGEM;
+}
+
+/* Desenha a tela do menu do estado atual. As funções do menu também leem
+   o teclado e dizem qual é a próxima tela.
+   Recebe a partida e a opção marcada no menu.
+   Retorna o próximo estado (o mesmo, se nada mudou). */
+static EstadoJogo desenharTelaDoMenu(const Partida *partida, int *opcaoMenu)
+{
+    switch (partida->estadoAtual) {
+        case ESTADO_MENU:       return desenharMenu(opcaoMenu);
+        case ESTADO_COMO_JOGAR: return desenharComoJogar();
+        case ESTADO_CREDITOS:   return desenharCreditos();
+        case ESTADO_VITORIA:    return desenharVitoria(partida);
+        case ESTADO_DERROTA:    return desenharGameOver(partida);
+        case ESTADO_JOGANDO:
+        case ESTADO_MONTAGEM:
+        case ESTADO_SAIR:
+            break;
+    }
+    return partida->estadoAtual;
+}
+
+/* Troca o estado do jogo. Entrar em JOGANDO vindo de outra tela começa
+   uma partida nova: as listas são montadas de novo pelo reiniciarPartida.
+   Recebe a partida, o próximo estado e a transição de sala. Não retorna nada. */
+static void mudarDeEstado(Partida *partida, EstadoJogo proximoEstado, TransicaoFita *transicao)
+{
+    if (proximoEstado == partida->estadoAtual) {
+        return;
+    }
+
+    if (proximoEstado == ESTADO_JOGANDO) {
+        reiniciarPartida(partida);
+        *transicao = (TransicaoFita){ 0 };
+    }
+
+    /* Depois do reinício, para nada sobrescrever o estado novo */
+    partida->estadoAtual = proximoEstado;
+}
+
+/* Desenha um quadro inteiro nas três folhas e depois na janela.
+   Durante a partida, a cena passa pela lanterna; nas telas do menu,
+   o texto vai direto para a folha quadro, sem escuridão.
+   Recebe a partida, a opção do menu, os efeitos, a lanterna, o tempo de jogo,
+   os sinais da criatura e a transição de sala.
+   Retorna o próximo estado escolhido nas telas do menu. */
+static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efeitos,
+                                 const EstadoDaLanterna *lanterna, float tempo,
+                                 SinaisCriatura sinais, const TransicaoFita *transicao)
+{
+    EstadoJogo proximoEstado = partida->estadoAtual;
     float raioAtual = RAIO_LANTERNA * lanterna->intensidade;
 
     /* Etapa 1: a cena, sem efeito nenhum */
@@ -50,11 +102,16 @@ static void desenharQuadro(Efeitos *efeitos, const EstadoDaLanterna *lanterna, f
     ClearBackground(COR_FUNDO);
     EndTextureMode();
 
-    /* Etapa 2: a cena através da lanterna, com a poeira por cima */
+    /* Etapa 2: na partida, a cena através da lanterna, com a poeira por cima;
+       nas telas do menu, o próprio menu */
     BeginTextureMode(efeitos->quadro);
     ClearBackground(BLACK);
-    desenharLanterna(efeitos, lanterna->posicao, raioAtual, lanterna->intensidade, NULL, 0);
-    desenharPoeira(efeitos, lanterna->posicao, raioAtual, tempo);
+    if (estaEmPartida(partida->estadoAtual)) {
+        desenharLanterna(efeitos, lanterna->posicao, raioAtual, lanterna->intensidade, NULL, 0);
+        desenharPoeira(efeitos, lanterna->posicao, raioAtual, tempo);
+    } else {
+        proximoEstado = desenharTelaDoMenu(partida, opcaoMenu);
+    }
     EndTextureMode();
 
     /* Etapa 3: o filtro VHS */
@@ -67,6 +124,8 @@ static void desenharQuadro(Efeitos *efeitos, const EstadoDaLanterna *lanterna, f
     ClearBackground(BLACK);
     desenharTelaNaJanela(efeitos);
     EndDrawing();
+
+    return proximoEstado;
 }
 
 /* Abre a janela, roda o jogo até o jogador sair e libera tudo no fim.
@@ -95,20 +154,27 @@ int main(void)
     lanterna.intensidade = 1.0f;
 
     TransicaoFita transicao = { 0 };
+    int opcaoMenu = 0;
 
     while (!WindowShouldClose() && partida.estadoAtual != ESTADO_SAIR) {
         float tempo = (float)GetTime();
         float segundosDoQuadro = GetFrameTime();
 
-        /* A distância vem da lista circular; -1 enquanto não há partida montada */
-        int distancia = distanciaCircular(partida.salaJogador, partida.salaCriatura);
+        /* A distância vem da lista circular. Fora da partida ela é -1
+           (desconhecida), para o menu não herdar os sinais da última partida */
+        int distancia = -1;
+        if (estaEmPartida(partida.estadoAtual)) {
+            distancia = distanciaCircular(partida.salaJogador, partida.salaCriatura);
+        }
         SinaisCriatura sinais = calcularSinaisCriatura(distancia);
 
         atualizarLanterna(&lanterna, tempo, sinais);
         atualizarPoeira(&efeitos, segundosDoQuadro);
         tocarSomAmbiente(&recursos, distancia);
 
-        desenharQuadro(&efeitos, &lanterna, tempo, sinais, &transicao);
+        EstadoJogo proximoEstado = desenharQuadro(&partida, &opcaoMenu, &efeitos, &lanterna,
+                                                  tempo, sinais, &transicao);
+        mudarDeEstado(&partida, proximoEstado, &transicao);
     }
 
     /* Primeiro a memória das listas, depois o que está na placa de vídeo;
