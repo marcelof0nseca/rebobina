@@ -2,7 +2,6 @@
  * efeitos.c
  * Responsável: Marcelo
  * Render textures, shaders da lanterna e do VHS, e a ampliação para a janela.
- * As funções marcadas como CASCA ainda estão em implementação.
  */
 #include <stdio.h>
 #include <math.h>
@@ -276,8 +275,80 @@ void desenharCirculoDegrade(Vector2 centro, float raio, Color corCentro, Color c
 #endif
 }
 
-/* CASCA: desenha scanlines, granulado e o "REC" com o contador */
-void aplicarEfeitoVHS(double segundosGravados)
+/* Começa uma troca de sala, se nenhuma estiver em andamento.
+   Recebe a transição e a direção (-1 = rebobinando, 1 = avançando).
+   Retorna 1 se a troca começou, 0 se já havia uma em andamento. */
+int iniciarRebobinar(TransicaoFita *transicao, int direcao)
 {
-    (void)segundosGravados;
+    if (fitaEstaTrocando(transicao)) {
+        return 0;
+    }
+
+    transicao->restante = 1.0f;
+    transicao->segundosDesdeInicio = 0.0f;
+    transicao->direcao = direcao;
+    transicao->salaJaTrocada = false;
+    return 1;
+}
+
+/* Avança a troca de sala no tempo.
+   Recebe a transição e quantos segundos durou o quadro.
+   Retorna 1 só no quadro em que a troca passa da metade:
+   é nesse quadro que a sala deve mudar. Nos outros, retorna 0. */
+int atualizarRebobinar(TransicaoFita *transicao, float segundosDoQuadro)
+{
+    if (!fitaEstaTrocando(transicao)) {
+        return 0;
+    }
+
+    transicao->restante -= segundosDoQuadro / DURACAO_REBOBINAR;
+    transicao->segundosDesdeInicio += segundosDoQuadro;
+
+    /* A conferência da metade vem antes do fim: mesmo que um quadro muito
+       longo pule direto para o fim, a sala ainda muda uma vez */
+    int trocarAgora = 0;
+    if (!transicao->salaJaTrocada && transicao->restante < 0.5f) {
+        transicao->salaJaTrocada = true;
+        trocarAgora = 1;
+    }
+
+    if (transicao->restante <= 0.0f) {
+        transicao->restante = 0.0f;
+        transicao->segundosDesdeInicio = 0.0f;
+        transicao->direcao = 0;
+    }
+
+    return trocarAgora;
+}
+
+/* Diz se há uma troca de sala em andamento.
+   Recebe a transição. Retorna 1 se está trocando, 0 se não. */
+int fitaEstaTrocando(const TransicaoFita *transicao)
+{
+    return transicao->restante > 0.0f;
+}
+
+/* Aplica o filtro VHS na folha quadro: ondulação, rasgos, cores separadas,
+   brilho difuso, scanlines, granulado, vinheta e a fita rebobinando.
+   Deve ser chamada dentro de BeginTextureMode(efeitos->tela).
+   Recebe os efeitos, o tempo de jogo, o tremor (0 = calmo, 1 = máximo)
+   e a transição de sala. Não retorna nada. */
+void aplicarEfeitoVHS(Efeitos *efeitos, float tempo, float tremor, const TransicaoFita *transicao)
+{
+    /* Força do rebobinar: sobe de 0 a 1 até a metade da troca e volta a 0 */
+    float rebobinar = 0.0f;
+    float tempoRebobinando = 0.0f;
+    if (fitaEstaTrocando(transicao)) {
+        rebobinar = sinf(PI * (1.0f - transicao->restante));
+        tempoRebobinando = transicao->segundosDesdeInicio;
+    }
+
+    SetShaderValue(efeitos->vhs, efeitos->localTempo, &tempo, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(efeitos->vhs, efeitos->localTremor, &tremor, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(efeitos->vhs, efeitos->localRebobinar, &rebobinar, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(efeitos->vhs, efeitos->localTempoRebobinando, &tempoRebobinando, SHADER_UNIFORM_FLOAT);
+
+    BeginShaderMode(efeitos->vhs);
+    desenharFolha(efeitos->quadro);
+    EndShaderMode();
 }

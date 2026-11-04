@@ -14,6 +14,17 @@
 #define MAX_FONTES_DE_LUZ 3   /* o shader da lanterna aceita no máximo 3 */
 #define QUANTIDADE_POEIRA 180
 
+#define DURACAO_REBOBINAR 0.7f  /* segundos da fita rebobinando entre salas */
+
+/* Troca de sala com a fita rebobinando ou avançando.
+   A sala muda na metade do efeito, quando a imagem está mais embaralhada */
+typedef struct {
+    float restante;             /* 1 no começo da troca, cai até 0 */
+    float segundosDesdeInicio;
+    int direcao;                /* -1 = rebobinando, 1 = avançando, 0 = parada */
+    bool salaJaTrocada;
+} TransicaoFita;
+
 /* Um grão de poeira flutuando no ar. Só aparece dentro da luz da lanterna */
 typedef struct {
     Vector2 posicao;
@@ -95,8 +106,26 @@ void desenharPoeira(const Efeitos *efeitos, Vector2 posicaoLuz, float raioLuz, f
    Recebe o centro, o raio e as cores do centro e da borda. Não retorna nada. */
 void desenharCirculoDegrade(Vector2 centro, float raio, Color corCentro, Color corBorda);
 
-/* Desenha scanlines, granulado e o "REC" com o contador SP 00:MM:SS:FF.
-   Recebe quantos segundos a fita está gravando. Não retorna nada. */
-void aplicarEfeitoVHS(double segundosGravados);
+/* Começa uma troca de sala, se nenhuma estiver em andamento.
+   Recebe a transição e a direção (-1 = rebobinando, 1 = avançando).
+   Retorna 1 se a troca começou, 0 se já havia uma em andamento. */
+int iniciarRebobinar(TransicaoFita *transicao, int direcao);
+
+/* Avança a troca de sala no tempo.
+   Recebe a transição e quantos segundos durou o quadro.
+   Retorna 1 só no quadro em que a troca passa da metade:
+   é nesse quadro que a sala deve mudar. Nos outros, retorna 0. */
+int atualizarRebobinar(TransicaoFita *transicao, float segundosDoQuadro);
+
+/* Diz se há uma troca de sala em andamento.
+   Recebe a transição. Retorna 1 se está trocando, 0 se não. */
+int fitaEstaTrocando(const TransicaoFita *transicao);
+
+/* Aplica o filtro VHS na folha quadro: ondulação, rasgos, cores separadas,
+   brilho difuso, scanlines, granulado, vinheta e a fita rebobinando.
+   Deve ser chamada dentro de BeginTextureMode(efeitos->tela).
+   Recebe os efeitos, o tempo de jogo, o tremor (0 = calmo, 1 = máximo)
+   e a transição de sala. Não retorna nada. */
+void aplicarEfeitoVHS(Efeitos *efeitos, float tempo, float tremor, const TransicaoFita *transicao);
 
 #endif
