@@ -744,10 +744,48 @@ void desenharSala(const Partida *partida, const Recursos *recursos, Vista vista,
     }
 }
 
-/* CASCA: desenha o vulto na porta quando a criatura está a uma sala */
-void desenharCriatura(const Partida *partida)
+/* Desenha o vulto da criatura na porta, se ela estiver numa sala vizinha:
+   na porta da direita se ela está em salaJogador->prox, na da esquerda
+   se está em salaJogador->ant. Deve ser chamada dentro da folha cena.
+   Recebe a partida, a vista, o tempo de jogo e onde guardar os olhos.
+   Retorna true se a criatura apareceu numa porta. */
+bool desenharCriatura(const Partida *partida, Vista vista, float tempo, OlhosDaCriatura *olhos)
 {
-    (void)partida;
+    const Sala *sala = partida->salaJogador;
+    if (sala == NULL || partida->salaCriatura == NULL) {
+        return false;
+    }
+
+    /* A porta vem direto dos ponteiros da lista circular */
+    int lado;
+    if (partida->salaCriatura == sala->prox) {
+        lado = 1;
+    } else if (partida->salaCriatura == sala->ant) {
+        lado = -1;
+    } else {
+        return false;
+    }
+
+    Vector2 cantos[4];
+    pontosDaPorta(vista, lado, cantos);
+
+    /* Uma luz vermelha fraca vem de dentro da porta */
+    desenharQuadrilatero(cantos[0], cantos[3], cantos[2], cantos[1], GetColor(0x3c0408ff));
+
+    float centroX = (cantos[0].x + cantos[1].x) / 2 + sinf(tempo * 1.3f) * 3;
+    float topo = (cantos[0].y + cantos[1].y) / 2;
+    float base = (cantos[2].y + cantos[3].y) / 2;
+    float altura = base - topo;
+
+    /* Corpo: cabeça alongada, ombros caídos e tronco até o chão */
+    DrawEllipse((int)centroX, (int)(topo + altura * 0.20f), altura * 0.09f, altura * 0.12f, BLACK);
+    DrawEllipse((int)centroX, (int)(topo + altura * 0.45f), altura * 0.15f, altura * 0.12f, BLACK);
+    DrawRectangle((int)(centroX - altura * 0.15f), (int)(topo + altura * 0.45f),
+                  (int)(altura * 0.30f), (int)(altura * 0.55f), BLACK);
+
+    olhos->posicao = (Vector2){ centroX, topo + altura * 0.19f };
+    olhos->tamanho = altura * 0.03f;
+    return true;
 }
 
 /* CASCA: desenha as salas em círculo, lendo a lista circular */
@@ -756,10 +794,95 @@ void desenharMinimapa(const Partida *partida)
     (void)partida;
 }
 
-/* CASCA: desenha o nome da sala, os fotogramas e a distância da criatura */
-void desenharHUD(const Partida *partida)
+/* Escreve as instruções da Cabine de Projeção: quantos fotogramas faltam,
+   a escolha do algoritmo ou os contadores da ordenação em andamento.
+   Recebe a partida e a fonte. Não retorna nada. */
+static void desenharInstrucoesDaCabine(const Partida *partida, Font fonte)
 {
-    (void)partida;
+    Vector2 centroBaixo = { LARGURA_VIRTUAL / 2.0f, ALTURA_VIRTUAL - 120.0f };
+
+    if (partida->estadoAtual != ESTADO_MONTAGEM) {
+        int faltam = TOTAL_FOTOGRAMAS - partida->totalColetados;
+        desenharTextoVHS(fonte, TextFormat("FALTAM %d FOTOGRAMAS PARA REMONTAR O FILME", faltam),
+                         centroBaixo, 20, COR_CREME, ALINHAR_CENTRO);
+        return;
+    }
+
+    const EstadoOrdenacao *ordenacao = &partida->ordenacao;
+    if (ordenacao->algoritmo == ALGORITMO_NENHUM) {
+        desenharTextoVHS(fonte, "COMO REMONTAR O FILME?", centroBaixo, 24, COR_CREME, ALINHAR_CENTRO);
+        desenharTextoVHS(fonte, "[1] BUBBLE SORT      [2] INSERTION SORT",
+                         (Vector2){ centroBaixo.x, centroBaixo.y + 32 }, 22, COR_AMBAR, ALINHAR_CENTRO);
+        return;
+    }
+
+    const char *nome = (ordenacao->algoritmo == ALGORITMO_BUBBLE) ? "BUBBLE SORT" : "INSERTION SORT";
+    desenharTextoVHS(fonte, TextFormat("%s   COMPARAÇÕES %d   TROCAS %d", nome,
+                                       ordenacao->comparacoes, ordenacao->trocas),
+                     centroBaixo, 22, COR_AMBAR, ALINHAR_CENTRO);
+}
+
+/* Desenha a interface por cima da imagem: REC, modo da fita, contador,
+   nome da sala e das vizinhas, fotogramas coletados e as instruções.
+   Não mostra nada sobre a criatura: o jogador percebe pelos sinais.
+   Deve ser chamada dentro da folha quadro, depois da lanterna.
+   Recebe a partida, os efeitos (para a fonte), a transição de sala
+   e o tempo de jogo. Não retorna nada. */
+void desenharHUD(const Partida *partida, const Efeitos *efeitos,
+                 const TransicaoFita *transicao, float tempo)
+{
+    const Sala *sala = partida->salaJogador;
+    if (sala == NULL) {
+        return;
+    }
+
+    Font fonte = efeitos->fonte;
+    float largura = LARGURA_VIRTUAL;
+    float altura = ALTURA_VIRTUAL;
+    Color corApagada = GetColor(0x8b9188ff);
+
+    /* Bolinha vermelha do REC piscando */
+    if (fmodf(tempo, 1.2f) < 0.8f) {
+        DrawCircle(42, 40, 8, COR_SANGUE);
+    }
+    desenharTextoVHS(fonte, "REC", (Vector2){ 58, 26 }, 30, COR_CREME, ALINHAR_ESQUERDA);
+
+    /* Modo da fita: ir para a sala seguinte avança, voltar rebobina */
+    const char *modo = "PLAY >";
+    if (fitaEstaTrocando(transicao)) {
+        modo = (transicao->direcao < 0) ? "<< REW" : ">> FF";
+        desenharTextoVHS(fonte, modo, (Vector2){ largura / 2, altura / 2 - 30 }, 60, COR_CREME, ALINHAR_CENTRO);
+    }
+    desenharTextoVHS(fonte, modo, (Vector2){ 34, 62 }, 22, COR_CREME, ALINHAR_ESQUERDA);
+
+    /* Contador da fita no formato SP 00:MM:SS:QQ (QQ = quadro, 30 por segundo) */
+    int minutos = (int)(tempo / 60);
+    int segundos = (int)tempo % 60;
+    int quadros = (int)((tempo - floorf(tempo)) * 30);
+    desenharTextoVHS(fonte, TextFormat("SP 00:%02d:%02d:%02d", minutos, segundos, quadros),
+                     (Vector2){ 34, altura - 52 }, 26, COR_CREME, ALINHAR_ESQUERDA);
+
+    /* Sala atual e vizinhas: os nomes vêm direto dos nós da lista circular */
+    desenharTextoVHS(fonte, sala->nome, (Vector2){ largura - 34, 26 }, 30, COR_CREME, ALINHAR_DIREITA);
+    desenharTextoVHS(fonte, TextFormat("FOTOGRAMAS %d/%d", partida->totalColetados, TOTAL_FOTOGRAMAS),
+                     (Vector2){ largura - 34, 60 }, 22, COR_AMBAR, ALINHAR_DIREITA);
+    desenharTextoVHS(fonte, TextFormat("< %s", sala->ant->nome), (Vector2){ 34, 108 }, 20,
+                     corApagada, ALINHAR_ESQUERDA);
+    desenharTextoVHS(fonte, TextFormat("%s >", sala->prox->nome), (Vector2){ largura - 34, 108 }, 20,
+                     corApagada, ALINHAR_DIREITA);
+
+    /* Mensagens só com a fita parada, para não brigarem com o chiado */
+    if (fitaEstaTrocando(transicao)) {
+        return;
+    }
+    if (sala->fotogramaNoChao != NULL) {
+        /* Abaixo do fotograma e afastada do contador, para não cobrir nenhum dos dois */
+        desenharTextoVHS(fonte, "UM FOTOGRAMA BRILHA NO CHÃO. APERTE E.",
+                         (Vector2){ largura / 2, altura - 70 }, 20, COR_CREME, ALINHAR_CENTRO);
+    }
+    if (sala->tipoCenario == CENARIO_CABINE) {
+        desenharInstrucoesDaCabine(partida, fonte);
+    }
 }
 
 /* CASCA: desenha os fotogramas e destaca o par comparado */

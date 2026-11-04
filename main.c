@@ -269,15 +269,19 @@ static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efei
     EstadoJogo proximoEstado = partida->estadoAtual;
     float raioAtual = RAIO_LANTERNA * lanterna->intensidade;
 
-    /* Etapa 1: a cena, sem efeito nenhum */
+    /* Etapa 1: a cena, sem efeito nenhum: a sala e o vulto da criatura na porta */
+    OlhosDaCriatura olhos = { 0 };
+    bool criaturaNaPorta = false;
     BeginTextureMode(efeitos->cena);
     ClearBackground(COR_FUNDO);
     if (estaEmPartida(partida->estadoAtual)) {
         desenharSala(partida, recursos, vista, tempo);
+        criaturaNaPorta = desenharCriatura(partida, vista, tempo, &olhos);
     }
     EndTextureMode();
 
-    /* Etapa 2: na partida, a cena através da lanterna, com a poeira por cima;
+    /* Etapa 2: na partida, a cena através da lanterna, com a poeira, os olhos
+       e o HUD por cima (depois da lanterna, para não serem escurecidos);
        nas telas do menu, o próprio menu */
     BeginTextureMode(efeitos->quadro);
     ClearBackground(BLACK);
@@ -287,6 +291,10 @@ static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efei
         desenharLanterna(efeitos, lanterna->posicao, raioAtual, lanterna->intensidade,
                          fontesDeLuz, quantidadeFontes);
         desenharPoeira(efeitos, lanterna->posicao, raioAtual, tempo);
+        if (criaturaNaPorta) {
+            desenharOlhosCriatura(olhos.posicao, olhos.tamanho, tempo, lanterna->posicao, raioAtual);
+        }
+        desenharHUD(partida, efeitos, transicao, tempo);
     } else {
         proximoEstado = desenharTelaDoMenu(partida, opcaoMenu);
     }
