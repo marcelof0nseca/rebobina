@@ -28,6 +28,90 @@ typedef struct {
     float intensidade;      /* 1 = normal, menor = piscando */
 } EstadoDaLanterna;
 
+/* O que o jogador pediu neste quadro. Separar a leitura do teclado da lógica
+   permite testar a lógica no terminal, sem janela */
+typedef struct {
+    int direcao;            /* -1 = esquerda, 1 = direita, 0 = parado */
+    bool coletar;
+} ComandosDoJogador;
+
+/* Lê as teclas da exploração.
+   Não recebe nada. Retorna os comandos deste quadro. */
+static ComandosDoJogador lerComandos(void)
+{
+    ComandosDoJogador comandos = { 0 };
+
+    if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) {
+        comandos.direcao = 1;
+    } else if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) {
+        comandos.direcao = -1;
+    }
+    comandos.coletar = IsKeyPressed(KEY_E);
+
+    return comandos;
+}
+
+/* Tira o fotograma do chão da sala e coloca na lista de coletados.
+   A sala solta o nó ANTES de ele entrar na lista: se os dois apontassem
+   para o mesmo nó, ele seria liberado duas vezes no fim.
+   Recebe a partida. Retorna 1 se coletou, 0 se a sala não tinha fotograma. */
+static int coletarFotograma(Partida *partida)
+{
+    Sala *sala = partida->salaJogador;
+    if (sala->fotogramaNoChao == NULL) {
+        return 0;
+    }
+
+    Fotograma *coletado = sala->fotogramaNoChao;
+    sala->fotogramaNoChao = NULL;
+    partida->fotogramasColetados = adicionarFotograma(partida->fotogramasColetados, coletado);
+    partida->totalColetados++;
+    return 1;
+}
+
+/* Atualiza a exploração: andar entre as salas, coletar fotogramas,
+   fazer barulho e conferir captura e chegada à Cabine.
+   Recebe a partida, a transição de sala, os comandos do jogador
+   e quantos segundos durou o quadro. Retorna o próximo estado. */
+static EstadoJogo atualizarExploracao(Partida *partida, TransicaoFita *transicao,
+                                      ComandosDoJogador comandos, float segundosDoQuadro)
+{
+    /* Enquanto o reiniciarPartida não monta as salas, não há onde andar */
+    if (partida->salaJogador == NULL) {
+        return ESTADO_JOGANDO;
+    }
+
+    if (comandos.direcao != 0) {
+        iniciarRebobinar(transicao, comandos.direcao);
+    }
+
+    /* A direção é guardada antes de atualizar: no último quadro da troca,
+       atualizarRebobinar zera transicao->direcao */
+    int direcaoDaTroca = transicao->direcao;
+    if (atualizarRebobinar(transicao, segundosDoQuadro)) {
+        Direcao direcao = (direcaoDaTroca > 0) ? DIRECAO_DIREITA : DIRECAO_ESQUERDA;
+        partida->salaJogador = moverJogador(partida->salaJogador, direcao);
+        atualizarRuido(partida, RUIDO_ANDAR, LIMITE_RUIDO_EXPLORACAO);
+    }
+
+    if (comandos.coletar && !fitaEstaTrocando(transicao) && coletarFotograma(partida)) {
+        atualizarRuido(partida, RUIDO_COLETAR, LIMITE_RUIDO_EXPLORACAO);
+    }
+
+    /* Mesmo nó da lista = mesmo lugar, não importa quem entrou na sala do outro */
+    if (verificarCaptura(partida)) {
+        return ESTADO_DERROTA;
+    }
+
+    if (!fitaEstaTrocando(transicao)
+        && partida->salaJogador->tipoCenario == CENARIO_CABINE
+        && partida->totalColetados == TOTAL_FOTOGRAMAS) {
+        return ESTADO_MONTAGEM;
+    }
+
+    return ESTADO_JOGANDO;
+}
+
 /* Move a lanterna em direção ao mouse, com um pequeno atraso, como uma mão
    segurando, e sorteia as piscadas conforme a criatura se aproxima.
    Recebe a lanterna, o tempo de jogo e os sinais da criatura. Não retorna nada. */
@@ -159,6 +243,13 @@ int main(void)
     while (!WindowShouldClose() && partida.estadoAtual != ESTADO_SAIR) {
         float tempo = (float)GetTime();
         float segundosDoQuadro = GetFrameTime();
+
+        /* Primeiro a lógica do quadro; o desenho vem depois, já com o estado novo */
+        if (partida.estadoAtual == ESTADO_JOGANDO) {
+            EstadoJogo depoisDaExploracao = atualizarExploracao(&partida, &transicao,
+                                                                lerComandos(), segundosDoQuadro);
+            mudarDeEstado(&partida, depoisDaExploracao, &transicao);
+        }
 
         /* A distância vem da lista circular. Fora da partida ela é -1
            (desconhecida), para o menu não herdar os sinais da última partida */
