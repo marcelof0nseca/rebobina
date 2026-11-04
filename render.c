@@ -58,6 +58,11 @@
 
 #define PROFUNDIDADE_BALCAO 0.55f
 #define PIPOCAS_NA_VITRINE 70
+#define PROFUNDIDADE_PIAS 0.8f
+#define ESPELHOS_DO_BANHEIRO 3
+#define COR_AZULEJO     GetColor(0x26312eff)
+#define COR_REJUNTE     GetColor(0x18201eff)
+#define COR_LOUCA       GetColor(0x9aa39dff)
 
 /* Mistura dois números; fracao = 0 devolve o primeiro, 1 devolve o segundo.
    Recebe o início, o fim e a fração. Retorna o valor misturado. */
@@ -499,6 +504,92 @@ static void desenharBomboniere(float tempo, Vista vista)
     desenharBalcao(vista);
 }
 
+/* Saguão: parecido com o corredor, com os cartazes das sessões,
+   a lâmpada pendurada e um tapete vinho no chão.
+   Recebe o tempo de jogo e a vista. Não retorna nada. */
+static void desenharSaguao(float tempo, Vista vista)
+{
+    /* Tapete em perspectiva, do fundo até perto da câmera */
+    desenharQuadrilatero(pontoNaSala(vista, 0.95f, 0.36f, 1), pontoNaSala(vista, 0.0f, 0.36f, 1),
+                         pontoNaSala(vista, 0.0f, 0.64f, 1), pontoNaSala(vista, 0.95f, 0.64f, 1),
+                         COR_VINHO);
+    desenharQuadrilatero(pontoNaSala(vista, 0.93f, 0.38f, 1), pontoNaSala(vista, 0.0f, 0.38f, 1),
+                         pontoNaSala(vista, 0.0f, 0.62f, 1), pontoNaSala(vista, 0.93f, 0.62f, 1),
+                         GetColor(0x5a171bff));
+
+    const char *titulos[CARTAZES_DO_CORREDOR] = { "SESSÃO 22H", "O ÚLTIMO ROLO", "EM BREVE" };
+    Color fundos[CARTAZES_DO_CORREDOR] = { GetColor(0x2e2416ff), GetColor(0x3a1517ff), GetColor(0x1f2a2aff) };
+    int centros[CARTAZES_DO_CORREDOR] = { 318, 480, 642 };
+
+    comecarCamada(vista, 1);
+    for (int cartaz = 0; cartaz < CARTAZES_DO_CORREDOR; cartaz++) {
+        desenharCartaz(centros[cartaz], titulos[cartaz], fundos[cartaz]);
+    }
+    terminarCamada();
+
+    desenharLampadaPendurada(tempo, vista);
+}
+
+/* Desenha uma rachadura saindo de um ponto, como num vidro quebrado.
+   Recebe o ponto de impacto. Não retorna nada. */
+static void desenharRachadura(Vector2 impacto)
+{
+    Color corDaRachadura = { 210, 225, 215, 170 };
+    Vector2 pontas[6] = { { -34, -30 }, { 30, -38 }, { 40, 6 }, { 22, 40 }, { -26, 36 }, { -42, 4 } };
+
+    for (int ponta = 0; ponta < 6; ponta++) {
+        /* Cada risco faz uma pequena curva no meio do caminho */
+        Vector2 meio = { impacto.x + pontas[ponta].x * 0.5f + 4, impacto.y + pontas[ponta].y * 0.5f - 3 };
+        Vector2 fim = { impacto.x + pontas[ponta].x, impacto.y + pontas[ponta].y };
+        DrawLineEx(impacto, meio, 1.5f, corDaRachadura);
+        DrawLineEx(meio, fim, 1.0f, corDaRachadura);
+    }
+    DrawCircleLines((int)impacto.x, (int)impacto.y, 5, corDaRachadura);
+}
+
+/* Banheiro: parede de azulejos, três espelhos esverdeados (o do meio rachado)
+   e três pias embaixo. A luz fria vem das cores verde-azuladas.
+   Recebe o tempo de jogo e a vista. Não retorna nada. */
+static void desenharBanheiro(float tempo, Vista vista)
+{
+    (void)tempo;
+    int centros[ESPELHOS_DO_BANHEIRO] = { 330, 480, 630 };
+
+    comecarCamada(vista, 1);
+    /* Azulejos: linhas horizontais e, em cada fileira, verticais desencontradas */
+    DrawRectangle(FUNDO_ESQUERDA, FUNDO_TOPO, FUNDO_DIREITA - FUNDO_ESQUERDA,
+                  FUNDO_BASE - 30 - FUNDO_TOPO, COR_AZULEJO);
+    for (int fileira = 0; FUNDO_TOPO + fileira * 18 < FUNDO_BASE - 30; fileira++) {
+        int alturaDaLinha = FUNDO_TOPO + fileira * 18;
+        DrawLine(FUNDO_ESQUERDA, alturaDaLinha, FUNDO_DIREITA, alturaDaLinha, COR_REJUNTE);
+        for (int coluna = FUNDO_ESQUERDA + (fileira % 2) * 18; coluna < FUNDO_DIREITA; coluna += 36) {
+            DrawLine(coluna, alturaDaLinha, coluna, alturaDaLinha + 18, COR_REJUNTE);
+        }
+    }
+
+    /* Espelhos: moldura, vidro esverdeado e um reflexo diagonal */
+    for (int espelho = 0; espelho < ESPELHOS_DO_BANHEIRO; espelho++) {
+        int esquerda = centros[espelho] - 50;
+        DrawRectangle(esquerda - 4, 136, 108, 98, GetColor(0x3b4440ff));
+        DrawRectangleGradientV(esquerda, 140, 100, 90, GetColor(0x3d5a52ff), GetColor(0x22332fff));
+        DrawTriangle((Vector2){ (float)esquerda + 14, 140 }, (Vector2){ (float)esquerda, 170 },
+                     (Vector2){ (float)esquerda + 34, 140 }, (Color){ 255, 255, 255, 22 });
+    }
+    desenharRachadura((Vector2){ 492, 178 });
+    terminarCamada();
+
+    /* Pias mais perto da câmera, cada uma embaixo do seu espelho */
+    comecarCamada(vista, PROFUNDIDADE_PIAS);
+    for (int pia = 0; pia < ESPELHOS_DO_BANHEIRO; pia++) {
+        int centro = centros[pia];
+        DrawRectangle(centro - 44, 278, 88, 14, COR_LOUCA);
+        DrawEllipse(centro, 285, 30, 5, GetColor(0x4a524dff));            /* cuba */
+        DrawRectangle(centro - 3, 266, 6, 12, GetColor(0x6b726dff));       /* torneira */
+        DrawRectangle(centro - 12, 292, 24, 56, GetColor(0x7c847fff));     /* coluna */
+    }
+    terminarCamada();
+}
+
 /* Fotograma caído no chão, com brilho âmbar pulsando.
    Recebe o tempo de jogo e a vista. Não retorna nada. */
 static void desenharFotogramaNoChao(float tempo, Vista vista)
@@ -573,9 +664,8 @@ void desenharSala(const Partida *partida, const Recursos *recursos, Vista vista,
         case CENARIO_CABINE:   desenharCabine(tempo, vista); break;
         case CENARIO_BILHETERIA: desenharBilheteria(tempo, vista); break;
         case CENARIO_BOMBONIERE: desenharBomboniere(tempo, vista); break;
-        case CENARIO_SAGUAO:
-        case CENARIO_BANHEIRO:
-            break;   /* desenhados nos próximos commits */
+        case CENARIO_SAGUAO:     desenharSaguao(tempo, vista); break;
+        case CENARIO_BANHEIRO:   desenharBanheiro(tempo, vista); break;
     }
 
     desenharNevoa(tempo, vista);
