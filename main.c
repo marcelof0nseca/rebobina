@@ -282,7 +282,10 @@ static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efei
     BeginTextureMode(efeitos->quadro);
     ClearBackground(BLACK);
     if (estaEmPartida(partida->estadoAtual)) {
-        desenharLanterna(efeitos, lanterna->posicao, raioAtual, lanterna->intensidade, NULL, 0);
+        Vector3 fontesDeLuz[MAX_FONTES_DE_LUZ];
+        int quantidadeFontes = fontesDeLuzDaSala(partida, tempo, vista, fontesDeLuz);
+        desenharLanterna(efeitos, lanterna->posicao, raioAtual, lanterna->intensidade,
+                         fontesDeLuz, quantidadeFontes);
         desenharPoeira(efeitos, lanterna->posicao, raioAtual, tempo);
     } else {
         proximoEstado = desenharTelaDoMenu(partida, opcaoMenu);

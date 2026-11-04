@@ -615,6 +615,75 @@ static void desenharFotogramaNoChao(float tempo, Vista vista)
     terminarCamada();
 }
 
+/* Acrescenta uma fonte de luz ao vetor, se ainda couber.
+   A posição é dada sem deslocamento e recebe o deslocamento da sua profundidade,
+   para a luz ficar em cima do objeto quando a câmera se move.
+   Recebe o vetor, a quantidade atual (atualizada aqui), a vista,
+   a posição, a profundidade e o raio. Não retorna nada. */
+static void acrescentarFonte(Vector3 fontes[MAX_FONTES_DE_LUZ], int *quantidade, Vista vista,
+                             Vector2 posicao, float profundidade, float raio)
+{
+    if (*quantidade >= MAX_FONTES_DE_LUZ) {
+        return;
+    }
+
+    Vector2 deslocamento = deslocamentoNaProfundidade(vista, profundidade);
+    fontes[*quantidade] = (Vector3){ posicao.x + deslocamento.x, posicao.y + deslocamento.y, raio };
+    (*quantidade)++;
+}
+
+/* Preenche as luzes fixas da sala atual (tela, lâmpada, letreiro, vitrine...)
+   e a do fotograma no chão, se houver, no formato (x, y, raio) que o shader
+   da lanterna usa. Nunca passa de MAX_FONTES_DE_LUZ.
+   Recebe a partida, o tempo de jogo, a vista e o vetor a preencher.
+   Retorna quantas fontes foram preenchidas. */
+int fontesDeLuzDaSala(const Partida *partida, float tempo, Vista vista,
+                      Vector3 fontes[MAX_FONTES_DE_LUZ])
+{
+    int quantidade = 0;
+    const Sala *sala = partida->salaJogador;
+    if (sala == NULL) {
+        return 0;
+    }
+
+    /* As luzes que falham usam as mesmas funções do desenho:
+       quando o letreiro apaga na tela, a luz dele apaga junto */
+    switch (sala->tipoCenario) {
+        case CENARIO_EXIBICAO:
+            acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 215 }, 1, 260);
+            break;
+        case CENARIO_CORREDOR:
+        case CENARIO_SAGUAO:
+            if (lampadaAcesa(tempo)) {
+                acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 90 }, 0.9f, 150);
+            }
+            break;
+        case CENARIO_CABINE:
+            acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 195 }, 1, 140);
+            acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 604, 254 }, 0.75f, 70);
+            break;
+        case CENARIO_BILHETERIA:
+            if (neonBilheteriaAceso(tempo)) {
+                acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 142 }, 1, 170);
+            }
+            break;
+        case CENARIO_BOMBONIERE:
+            acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 385, 255 }, 1, 150);
+            break;
+        case CENARIO_BANHEIRO:
+            /* Luz fraca: um raio pequeno sobre os espelhos */
+            acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 185 }, 1, 110);
+            break;
+    }
+
+    if (sala->fotogramaNoChao != NULL) {
+        acrescentarFonte(fontes, &quantidade, vista, (Vector2){ POS_FOTOGRAMA_X, POS_FOTOGRAMA_Y },
+                         PROFUNDIDADE_FOTOGRAMA, 110);
+    }
+
+    return quantidade;
+}
+
 /* Calcula a vista a partir de para onde o jogador olha, somando o balanço
    de quem segura a filmadora e o tremor quando a criatura está perto.
    Recebe para onde olha (de -1 a 1 em cada eixo), o tempo de jogo

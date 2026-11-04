@@ -40,6 +40,14 @@ Vista calcularVista(Vector2 olhar, float tempo, float tremor);
    a vista e o tempo de jogo. Não retorna nada. */
 void desenharSala(const Partida *partida, const Recursos *recursos, Vista vista, float tempo);
 
+/* Preenche as luzes fixas da sala atual (tela, lâmpada, letreiro, vitrine...)
+   e a do fotograma no chão, se houver, no formato (x, y, raio) que o shader
+   da lanterna usa. Nunca passa de MAX_FONTES_DE_LUZ.
+   Recebe a partida, o tempo de jogo, a vista e o vetor a preencher.
+   Retorna quantas fontes foram preenchidas. */
+int fontesDeLuzDaSala(const Partida *partida, float tempo, Vista vista,
+                      Vector3 fontes[MAX_FONTES_DE_LUZ]);
+
 /* Desenha o vulto na porta quando a criatura está a uma sala de distância.
    Recebe a partida. Não retorna nada. */
 void desenharCriatura(const Partida *partida);
