@@ -16,10 +16,12 @@
 #include "render.h"
 #include "recursos.h"
 #include "regras.h"
+#include "ordenacao.h"
 #include "menu.h"
 
 #define RAIO_LANTERNA 230.0f
 #define SUAVIDADE_LANTERNA 0.12f   /* quanto a lanterna anda até o mouse por quadro */
+#define INTERVALO_PASSO 0.6f       /* segundos entre um passo e outro da ordenação */
 
 /* A lanterna do jogador: onde está, se está falhando e com que força ilumina */
 typedef struct {
@@ -33,9 +35,10 @@ typedef struct {
 typedef struct {
     int direcao;            /* -1 = esquerda, 1 = direita, 0 = parado */
     bool coletar;
+    TipoAlgoritmo algoritmoEscolhido;   /* NENHUM se não apertou 1 nem 2 */
 } ComandosDoJogador;
 
-/* Lê as teclas da exploração.
+/* Lê as teclas da exploração e da escolha do algoritmo na Cabine.
    Não recebe nada. Retorna os comandos deste quadro. */
 static ComandosDoJogador lerComandos(void)
 {
@@ -47,6 +50,13 @@ static ComandosDoJogador lerComandos(void)
         comandos.direcao = -1;
     }
     comandos.coletar = IsKeyPressed(KEY_E);
+
+    comandos.algoritmoEscolhido = ALGORITMO_NENHUM;
+    if (IsKeyPressed(KEY_ONE) || IsKeyPressed(KEY_KP_1)) {
+        comandos.algoritmoEscolhido = ALGORITMO_BUBBLE;
+    } else if (IsKeyPressed(KEY_TWO) || IsKeyPressed(KEY_KP_2)) {
+        comandos.algoritmoEscolhido = ALGORITMO_INSERTION;
+    }
 
     return comandos;
 }
@@ -112,6 +122,65 @@ static EstadoJogo atualizarExploracao(Partida *partida, TransicaoFita *transicao
     return ESTADO_JOGANDO;
 }
 
+/* Executa um passo da ordenação escolhida e faz o barulho correspondente.
+   Recebe a partida.
+   Retorna o que o passo fez (comparação, troca ou fim). */
+static TipoPasso executarPassoDaOrdenacao(Partida *partida)
+{
+    TipoPasso passo;
+    if (partida->ordenacao.algoritmo == ALGORITMO_BUBBLE) {
+        passo = passoBubbleSort(partida->fotogramasColetados, &partida->ordenacao);
+    } else {
+        passo = passoInsertionSort(partida->fotogramasColetados, &partida->ordenacao);
+    }
+
+    /* Cada comparação e cada troca fazem barulho: é aqui que o algoritmo vira risco */
+    if (passo == PASSO_COMPARACAO) {
+        atualizarRuido(partida, RUIDO_COMPARAR, LIMITE_RUIDO_MONTAGEM);
+    } else if (passo == PASSO_TROCA) {
+        atualizarRuido(partida, RUIDO_TROCAR, LIMITE_RUIDO_MONTAGEM);
+    }
+
+    return passo;
+}
+
+/* Atualiza a montagem do filme: espera o jogador escolher o algoritmo
+   e depois executa um passo da ordenação a cada INTERVALO_PASSO segundos.
+   Recebe a partida, os comandos do jogador, quantos segundos durou o quadro
+   e quanto falta para o próximo passo (atualizado aqui).
+   Retorna o próximo estado. */
+static EstadoJogo atualizarMontagem(Partida *partida, ComandosDoJogador comandos,
+                                    float segundosDoQuadro, float *esperaProximoPasso)
+{
+    if (partida->ordenacao.algoritmo == ALGORITMO_NENHUM) {
+        if (comandos.algoritmoEscolhido != ALGORITMO_NENHUM) {
+            iniciarOrdenacao(&partida->ordenacao, comandos.algoritmoEscolhido);
+            *esperaProximoPasso = INTERVALO_PASSO;
+        }
+        return ESTADO_MONTAGEM;
+    }
+
+    /* Um passo por vez, com intervalo, para o jogador ver os fotogramas trocando */
+    *esperaProximoPasso -= segundosDoQuadro;
+    if (*esperaProximoPasso > 0) {
+        return ESTADO_MONTAGEM;
+    }
+    *esperaProximoPasso = INTERVALO_PASSO;
+
+    TipoPasso passo = executarPassoDaOrdenacao(partida);
+
+    /* A criatura continua vindo enquanto o filme é montado */
+    if (verificarCaptura(partida)) {
+        return ESTADO_DERROTA;
+    }
+
+    if (passo == PASSO_FIM && verificarVitoria(partida)) {
+        return ESTADO_VITORIA;
+    }
+
+    return ESTADO_MONTAGEM;
+}
+
 /* Move a lanterna em direção ao mouse, com um pequeno atraso, como uma mão
    segurando, e sorteia as piscadas conforme a criatura se aproxima.
    Recebe a lanterna, o tempo de jogo e os sinais da criatura. Não retorna nada. */
@@ -152,6 +221,7 @@ static EstadoJogo desenharTelaDoMenu(const Partida *partida, int *opcaoMenu)
 
 /* Troca o estado do jogo. Entrar em JOGANDO vindo de outra tela começa
    uma partida nova: as listas são montadas de novo pelo reiniciarPartida.
+   Entrar em MONTAGEM zera a ordenação, à espera da escolha do algoritmo.
    Recebe a partida, o próximo estado e a transição de sala. Não retorna nada. */
 static void mudarDeEstado(Partida *partida, EstadoJogo proximoEstado, TransicaoFita *transicao)
 {
@@ -162,6 +232,11 @@ static void mudarDeEstado(Partida *partida, EstadoJogo proximoEstado, TransicaoF
     if (proximoEstado == ESTADO_JOGANDO) {
         reiniciarPartida(partida);
         *transicao = (TransicaoFita){ 0 };
+    }
+
+    /* Na Cabine, o jogador ainda vai escolher o algoritmo */
+    if (proximoEstado == ESTADO_MONTAGEM) {
+        iniciarOrdenacao(&partida->ordenacao, ALGORITMO_NENHUM);
     }
 
     /* Depois do reinício, para nada sobrescrever o estado novo */
@@ -239,6 +314,7 @@ int main(void)
 
     TransicaoFita transicao = { 0 };
     int opcaoMenu = 0;
+    float esperaProximoPasso = 0;
 
     while (!WindowShouldClose() && partida.estadoAtual != ESTADO_SAIR) {
         float tempo = (float)GetTime();
@@ -249,6 +325,10 @@ int main(void)
             EstadoJogo depoisDaExploracao = atualizarExploracao(&partida, &transicao,
                                                                 lerComandos(), segundosDoQuadro);
             mudarDeEstado(&partida, depoisDaExploracao, &transicao);
+        } else if (partida.estadoAtual == ESTADO_MONTAGEM) {
+            EstadoJogo depoisDaMontagem = atualizarMontagem(&partida, lerComandos(),
+                                                            segundosDoQuadro, &esperaProximoPasso);
+            mudarDeEstado(&partida, depoisDaMontagem, &transicao);
         }
 
         /* A distância vem da lista circular. Fora da partida ela é -1
