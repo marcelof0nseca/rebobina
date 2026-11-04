@@ -23,10 +23,6 @@
    Recebe a partida e os recursos. Não retorna nada. */
 void desenharSala(const Partida *partida, const Recursos *recursos);
 
-/* Desenha a escuridão com o círculo de luz seguindo o mouse.
-   Não recebe nada. Não retorna nada. */
-void desenharLanterna(void);
-
 /* Desenha o vulto na porta quando a criatura está a uma sala de distância.
    Recebe a partida. Não retorna nada. */
 void desenharCriatura(const Partida *partida);

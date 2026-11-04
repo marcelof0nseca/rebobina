@@ -12,11 +12,6 @@ void desenharSala(const Partida *partida, const Recursos *recursos)
     (void)recursos;
 }
 
-/* CASCA: desenha a escuridão com o círculo de luz seguindo o mouse */
-void desenharLanterna(void)
-{
-}
-
 /* CASCA: desenha o vulto na porta quando a criatura está a uma sala */
 void desenharCriatura(const Partida *partida)
 {
