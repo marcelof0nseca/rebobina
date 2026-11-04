@@ -49,7 +49,8 @@ typedef enum {
     ESTADO_JOGANDO,
     ESTADO_MONTAGEM,
     ESTADO_VITORIA,
-    ESTADO_DERROTA
+    ESTADO_DERROTA,
+    ESTADO_SAIR             /* o jogador escolheu Sair no menu: o laço termina */
 } EstadoJogo;
 
 /* Algoritmo escolhido na Cabine. NENHUM = jogador ainda não escolheu */

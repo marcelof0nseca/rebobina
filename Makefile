@@ -15,13 +15,15 @@ rebobina: $(OBJETOS)
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Compila e roda o teste da lista circular, sem raylib
-teste: teste_salas.c salas.c salas.h jogo.h
+# Compila e roda os testes de terminal (salas e criatura), sem raylib
+teste: teste_salas.c teste_criatura.c salas.c criatura.c salas.h criatura.h jogo.h
 	$(CC) $(CFLAGS) teste_salas.c salas.c -o teste_salas
+	$(CC) $(CFLAGS) teste_criatura.c criatura.c salas.c -o teste_criatura
 	./teste_salas
+	./teste_criatura
 
 # Apaga o que foi gerado pela compilação
 clean:
-	rm -f $(OBJETOS) rebobina teste_salas
+	rm -f $(OBJETOS) rebobina teste_salas teste_criatura
 
 .PHONY: clean teste
