@@ -25,4 +25,7 @@ TipoPasso passoInsertionSort(Fotograma *cabeca, EstadoOrdenacao *estado);
 /* Versão completa para testes no terminal, antes da versão por passos. */
 void bubbleSortCompleto(Fotograma *cabeca);
 
+/* Versão completa do Insertion Sort para testes no terminal. */
+void insertionSortCompleto(Fotograma *cabeca);
+
 #endif
