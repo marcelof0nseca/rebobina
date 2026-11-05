@@ -55,6 +55,8 @@ dkms.conf
 rebobina
 teste_salas
 teste_criatura
+teste_bubble
+teste_insertion
 
 # Arquivos locais, que não vão para o repositório
 CLAUDE.md
