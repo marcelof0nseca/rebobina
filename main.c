@@ -243,31 +243,58 @@ static void mudarDeEstado(Partida *partida, EstadoJogo proximoEstado, TransicaoF
     partida->estadoAtual = proximoEstado;
 }
 
+/* Calcula para onde a câmera olha, a partir da posição da lanterna:
+   de -1 (esquerda ou topo) a 1 (direita ou base) em cada eixo.
+   Recebe a lanterna. Retorna a direção do olhar. */
+static Vector2 olharDaLanterna(const EstadoDaLanterna *lanterna)
+{
+    Vector2 olhar = {
+        (lanterna->posicao.x - LARGURA_VIRTUAL / 2.0f) / (LARGURA_VIRTUAL / 2.0f),
+        (lanterna->posicao.y - ALTURA_VIRTUAL / 2.0f) / (ALTURA_VIRTUAL / 2.0f)
+    };
+    return olhar;
+}
+
 /* Desenha um quadro inteiro nas três folhas e depois na janela.
    Durante a partida, a cena passa pela lanterna; nas telas do menu,
    o texto vai direto para a folha quadro, sem escuridão.
-   Recebe a partida, a opção do menu, os efeitos, a lanterna, o tempo de jogo,
-   os sinais da criatura e a transição de sala.
+   Recebe a partida, a opção do menu, os efeitos, os recursos, a lanterna,
+   a vista, o tempo de jogo, os sinais da criatura e a transição de sala.
    Retorna o próximo estado escolhido nas telas do menu. */
 static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efeitos,
-                                 const EstadoDaLanterna *lanterna, float tempo,
-                                 SinaisCriatura sinais, const TransicaoFita *transicao)
+                                 const Recursos *recursos, const EstadoDaLanterna *lanterna,
+                                 Vista vista, float tempo, SinaisCriatura sinais,
+                                 const TransicaoFita *transicao)
 {
     EstadoJogo proximoEstado = partida->estadoAtual;
     float raioAtual = RAIO_LANTERNA * lanterna->intensidade;
 
-    /* Etapa 1: a cena, sem efeito nenhum */
+    /* Etapa 1: a cena, sem efeito nenhum: a sala e o vulto da criatura na porta */
+    OlhosDaCriatura olhos = { 0 };
+    bool criaturaNaPorta = false;
     BeginTextureMode(efeitos->cena);
     ClearBackground(COR_FUNDO);
+    if (estaEmPartida(partida->estadoAtual)) {
+        desenharSala(partida, recursos, vista, tempo);
+        criaturaNaPorta = desenharCriatura(partida, vista, tempo, &olhos);
+    }
     EndTextureMode();
 
-    /* Etapa 2: na partida, a cena através da lanterna, com a poeira por cima;
+    /* Etapa 2: na partida, a cena através da lanterna, com a poeira, os olhos
+       e o HUD por cima (depois da lanterna, para não serem escurecidos);
        nas telas do menu, o próprio menu */
     BeginTextureMode(efeitos->quadro);
     ClearBackground(BLACK);
     if (estaEmPartida(partida->estadoAtual)) {
-        desenharLanterna(efeitos, lanterna->posicao, raioAtual, lanterna->intensidade, NULL, 0);
+        Vector3 fontesDeLuz[MAX_FONTES_DE_LUZ];
+        int quantidadeFontes = fontesDeLuzDaSala(partida, tempo, vista, fontesDeLuz);
+        desenharLanterna(efeitos, lanterna->posicao, raioAtual, lanterna->intensidade,
+                         fontesDeLuz, quantidadeFontes);
         desenharPoeira(efeitos, lanterna->posicao, raioAtual, tempo);
+        if (criaturaNaPorta) {
+            desenharOlhosCriatura(olhos.posicao, olhos.tamanho, tempo, lanterna->posicao, raioAtual);
+        }
+        desenharHUD(partida, efeitos, transicao, tempo);
     } else {
         proximoEstado = desenharTelaDoMenu(partida, opcaoMenu);
     }
@@ -343,8 +370,11 @@ int main(void)
         atualizarPoeira(&efeitos, segundosDoQuadro);
         tocarSomAmbiente(&recursos, distancia);
 
-        EstadoJogo proximoEstado = desenharQuadro(&partida, &opcaoMenu, &efeitos, &lanterna,
-                                                  tempo, sinais, &transicao);
+        /* A câmera olha para onde a lanterna aponta e treme com a criatura perto */
+        Vista vista = calcularVista(olharDaLanterna(&lanterna), tempo, sinais.tremorCamera);
+
+        EstadoJogo proximoEstado = desenharQuadro(&partida, &opcaoMenu, &efeitos, &recursos,
+                                                  &lanterna, vista, tempo, sinais, &transicao);
         mudarDeEstado(&partida, proximoEstado, &transicao);
     }
 
