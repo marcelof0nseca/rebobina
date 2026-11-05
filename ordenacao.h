@@ -22,6 +22,7 @@ TipoPasso passoBubbleSort(Fotograma *cabeca, EstadoOrdenacao *estado);
    Retorna o que foi feito (PASSO_COMPARACAO, PASSO_TROCA ou PASSO_FIM). */
 TipoPasso passoInsertionSort(Fotograma *cabeca, EstadoOrdenacao *estado);
 
-void bubblesortcompleto(Fotograma *cabeca);
+/* Versão completa para testes no terminal, antes da versão por passos. */
+void bubbleSortCompleto(Fotograma *cabeca);
 
 #endif
