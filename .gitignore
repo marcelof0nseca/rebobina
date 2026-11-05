@@ -54,10 +54,9 @@ dkms.conf
 # Executáveis do projeto
 rebobina
 teste_salas
+teste_criatura
 
 # Arquivos locais, que não vão para o repositório
 CLAUDE.md
 .claude/
 .vscode/
-
-/.ctmp 
