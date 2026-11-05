@@ -35,3 +35,5 @@ TipoPasso passoInsertionSort(Fotograma *cabeca, EstadoOrdenacao *estado)
     (void)estado;
     return PASSO_FIM;
 }
+
+void bubblesortcompleto(Fotograma *cabeca);
