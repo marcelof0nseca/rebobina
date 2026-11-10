@@ -82,8 +82,12 @@ typedef struct {
     float progresso;          /* 0 = o passo acabou de acontecer, 1 = hora do próximo */
 } AnimacaoOrdenacao;
 
-/* Desenha os fotogramas e destaca o par que a ordenação está comparando.
-   Recebe a partida e os recursos. Não retorna nada. */
-void desenharOrdenacao(const Partida *partida, const Recursos *recursos);
+/* Desenha a tira de filme da montagem: os fotogramas na ordem atual da lista,
+   o par que está sendo comparado e os dois deslizando quando trocam.
+   Deve ser chamada dentro da folha quadro, depois da lanterna.
+   Recebe a partida, os recursos (as imagens dos fotogramas, se carregadas),
+   os efeitos (para a fonte) e a animação do último passo. Não retorna nada. */
+void desenharOrdenacao(const Partida *partida, const Recursos *recursos,
+                       const Efeitos *efeitos, const AnimacaoOrdenacao *animacao);
 
 #endif

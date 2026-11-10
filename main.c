@@ -267,12 +267,14 @@ static Vector2 olharDaLanterna(const EstadoDaLanterna *lanterna)
    Durante a partida, a cena passa pela lanterna; nas telas do menu,
    o texto vai direto para a folha quadro, sem escuridão.
    Recebe a partida, a opção do menu, os efeitos, os recursos, a lanterna,
-   a vista, o tempo de jogo, os sinais da criatura e a transição de sala.
+   a vista, o tempo de jogo, os sinais da criatura, a transição de sala
+   e a animação da ordenação.
    Retorna o próximo estado escolhido nas telas do menu. */
 static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efeitos,
                                  const Recursos *recursos, const EstadoDaLanterna *lanterna,
                                  Vista vista, float tempo, SinaisCriatura sinais,
-                                 const TransicaoFita *transicao)
+                                 const TransicaoFita *transicao,
+                                 const AnimacaoOrdenacao *animacaoOrdenacao)
 {
     EstadoJogo proximoEstado = partida->estadoAtual;
     float raioAtual = RAIO_LANTERNA * lanterna->intensidade;
@@ -301,6 +303,10 @@ static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efei
         desenharPoeira(efeitos, lanterna->posicao, raioAtual, tempo);
         if (criaturaNaPorta) {
             desenharOlhosCriatura(olhos.posicao, olhos.tamanho, tempo, lanterna->posicao, raioAtual);
+        }
+        /* Na montagem, a tira de filme mostra a lista sendo ordenada */
+        if (partida->estadoAtual == ESTADO_MONTAGEM) {
+            desenharOrdenacao(partida, recursos, efeitos, animacaoOrdenacao);
         }
         desenharHUD(partida, efeitos, transicao, tempo);
     } else {
@@ -383,7 +389,8 @@ int main(void)
         Vista vista = calcularVista(olharDaLanterna(&lanterna), tempo, sinais.tremorCamera);
 
         EstadoJogo proximoEstado = desenharQuadro(&partida, &opcaoMenu, &efeitos, &recursos,
-                                                  &lanterna, vista, tempo, sinais, &transicao);
+                                                  &lanterna, vista, tempo, sinais, &transicao,
+                                                  &animacaoOrdenacao);
         mudarDeEstado(&partida, proximoEstado, &transicao);
     }
 

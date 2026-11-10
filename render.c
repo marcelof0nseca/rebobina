@@ -35,6 +35,13 @@
 #define POS_FOTOGRAMA_Y 430
 #define PROFUNDIDADE_FOTOGRAMA 0.6f
 
+/* Tira de filme da montagem (desenharOrdenacao) */
+#define TOPO_DA_TIRA 160
+#define ALTURA_DA_TIRA 170
+#define ESPACO_ENTRE_FOTOGRAMAS 124.0f
+#define LADO_DO_FOTOGRAMA 104.0f
+#define ALTURA_DO_ARCO 58.0f   /* mais que metade do lado: no cruzamento, os dois não se cobrem */
+
 #define FILEIRAS_DE_POLTRONAS 4
 #define CARTAZES_DO_CORREDOR 3
 
@@ -808,18 +815,18 @@ static void desenharInstrucoesDaCabine(const Partida *partida, Font fonte)
         return;
     }
 
-    const EstadoOrdenacao *ordenacao = &partida->ordenacao;
-    if (ordenacao->algoritmo == ALGORITMO_NENHUM) {
-        desenharTextoVHS(fonte, "COMO REMONTAR O FILME?", centroBaixo, 24, COR_CREME, ALINHAR_CENTRO);
-        desenharTextoVHS(fonte, "[1] BUBBLE SORT      [2] INSERTION SORT",
-                         (Vector2){ centroBaixo.x, centroBaixo.y + 32 }, 22, COR_AMBAR, ALINHAR_CENTRO);
+    /* A escolha do algoritmo é contada como um projecionista contaria:
+       [1] é o Bubble Sort e [2] é o Insertion Sort, sem os nomes técnicos na tela */
+    if (partida->ordenacao.algoritmo == ALGORITMO_NENHUM) {
+        desenharTextoVHS(fonte, "COMO MONTAR O FILME?", centroBaixo, 24, COR_CREME, ALINHAR_CENTRO);
+        desenharTextoVHS(fonte, "[1] PASSAR O ROLO INTEIRO, VÁRIAS VEZES",
+                         (Vector2){ centroBaixo.x, centroBaixo.y + 32 }, 20, COR_AMBAR, ALINHAR_CENTRO);
+        desenharTextoVHS(fonte, "[2] ENCAIXAR QUADRO A QUADRO",
+                         (Vector2){ centroBaixo.x, centroBaixo.y + 58 }, 20, COR_AMBAR, ALINHAR_CENTRO);
         return;
     }
 
-    const char *nome = (ordenacao->algoritmo == ALGORITMO_BUBBLE) ? "BUBBLE SORT" : "INSERTION SORT";
-    desenharTextoVHS(fonte, TextFormat("%s   COMPARAÇÕES %d   TROCAS %d", nome,
-                                       ordenacao->comparacoes, ordenacao->trocas),
-                     centroBaixo, 22, COR_AMBAR, ALINHAR_CENTRO);
+    desenharTextoVHS(fonte, "O PROJETOR RANGE A CADA MOVIMENTO...", centroBaixo, 20, COR_CREME, ALINHAR_CENTRO);
 }
 
 /* Desenha a interface por cima da imagem: REC, modo da fita, contador,
@@ -885,9 +892,102 @@ void desenharHUD(const Partida *partida, const Efeitos *efeitos,
     }
 }
 
-/* CASCA: desenha os fotogramas e destaca o par comparado */
-void desenharOrdenacao(const Partida *partida, const Recursos *recursos)
+/* Centro horizontal de cada posição da tira de filme.
+   Recebe a posição na lista (0 a TOTAL_FOTOGRAMAS - 1). Retorna o x na tela. */
+static float centroDaPosicao(int posicao)
 {
-    (void)partida;
-    (void)recursos;
+    float larguraDaTira = TOTAL_FOTOGRAMAS * ESPACO_ENTRE_FOTOGRAMAS;
+    return (LARGURA_VIRTUAL - larguraDaTira) / 2 + ESPACO_ENTRE_FOTOGRAMAS * (posicao + 0.5f);
+}
+
+/* Desenha a faixa escura da tira de filme, com os furos em cima e embaixo.
+   Não recebe nada. Não retorna nada. */
+static void desenharTiraDeFilme(void)
+{
+    float larguraDaTira = TOTAL_FOTOGRAMAS * ESPACO_ENTRE_FOTOGRAMAS + 24;
+    float esquerda = (LARGURA_VIRTUAL - larguraDaTira) / 2;
+    DrawRectangle((int)esquerda, TOPO_DA_TIRA, (int)larguraDaTira, ALTURA_DA_TIRA, (Color){ 8, 6, 5, 225 });
+    for (float furo = esquerda + 10; furo < esquerda + larguraDaTira - 10; furo += 22) {
+        DrawRectangle((int)furo, TOPO_DA_TIRA + 6, 10, 8, GetColor(0x2a2018ff));
+        DrawRectangle((int)furo, TOPO_DA_TIRA + ALTURA_DA_TIRA - 14, 10, 8, GetColor(0x2a2018ff));
+    }
+}
+
+/* Desenha um fotograma da tira: a imagem dele, se estiver carregada,
+   ou um quadro âmbar com o número da posição no filme.
+   Recebe o fotograma, os recursos, o centro, a cor da borda e a fonte. Não retorna nada. */
+static void desenharFotogramaDaTira(const Fotograma *fotograma, const Recursos *recursos,
+                                    Vector2 centro, Color borda, Font fonte)
+{
+    Rectangle quadro = { centro.x - LADO_DO_FOTOGRAMA / 2, centro.y - LADO_DO_FOTOGRAMA / 2,
+                         LADO_DO_FOTOGRAMA, LADO_DO_FOTOGRAMA };
+    int indiceDaImagem = fotograma->ordemCorreta - 1;
+
+    DrawRectangleRec((Rectangle){ quadro.x - 4, quadro.y - 4, quadro.width + 8, quadro.height + 8 }, borda);
+    if (recursos != NULL && indiceDaImagem >= 0 && indiceDaImagem < TOTAL_FOTOGRAMAS
+        && recursos->imagensFotogramas[indiceDaImagem].id != 0) {
+        Texture2D imagem = recursos->imagensFotogramas[indiceDaImagem];
+        DrawTexturePro(imagem, (Rectangle){ 0, 0, (float)imagem.width, (float)imagem.height },
+                       quadro, (Vector2){ 0, 0 }, 0, WHITE);
+    } else {
+        /* Sem a imagem: um quadro âmbar com o número grande */
+        DrawRectangleRec(quadro, ColorAlpha(COR_AMBAR, 0.35f));
+        desenharTextoVHS(fonte, TextFormat("%d", fotograma->ordemCorreta),
+                         (Vector2){ centro.x, centro.y - 22 }, 44, COR_CREME, ALINHAR_CENTRO);
+    }
+}
+
+/* Desenha a tira de filme da montagem: os fotogramas na ordem atual da lista,
+   o par que está sendo comparado e os dois deslizando quando trocam.
+   Deve ser chamada dentro da folha quadro, depois da lanterna.
+   Recebe a partida, os recursos (as imagens dos fotogramas, se carregadas),
+   os efeitos (para a fonte) e a animação do último passo. Não retorna nada. */
+void desenharOrdenacao(const Partida *partida, const Recursos *recursos,
+                       const Efeitos *efeitos, const AnimacaoOrdenacao *animacao)
+{
+    const EstadoOrdenacao *ordenacao = &partida->ordenacao;
+    int parEsquerdo = ordenacao->posicaoComparada;
+    bool terminou = ordenacao->terminou && ordenacao->algoritmo != ALGORITMO_NENHUM;
+    bool comparando = animacao->houvePasso && animacao->ultimoPasso == PASSO_COMPARACAO;
+    bool trocando = animacao->houvePasso && animacao->ultimoPasso == PASSO_TROCA;
+
+    /* O deslize da troca acontece nos primeiros 70% do intervalo, com início e fim suaves */
+    float fracao = fminf(1.0f, animacao->progresso / 0.7f);
+    float deslize = fracao * fracao * (3.0f - 2.0f * fracao);
+
+    desenharTiraDeFilme();
+
+    /* Os fotogramas são desenhados na ordem dos nós da lista encadeada */
+    int posicao = 0;
+    for (const Fotograma *atual = partida->fotogramasColetados;
+         atual != NULL && posicao < TOTAL_FOTOGRAMAS;
+         atual = atual->prox, posicao++) {
+        bool noPar = (posicao == parEsquerdo || posicao == parEsquerdo + 1);
+        Vector2 centro = { centroDaPosicao(posicao), TOPO_DA_TIRA + ALTURA_DA_TIRA / 2.0f - 8 };
+        Color borda = GetColor(0x16110cff);
+
+        if (terminou) {
+            borda = COR_AMBAR;
+        } else if (noPar && comparando) {
+            /* Vermelho: fora de ordem, vai trocar. Âmbar: os dois já estão em ordem */
+            borda = ordenacao->trocaPendente ? COR_SANGUE : COR_AMBAR;
+        } else if (noPar && trocando) {
+            /* O conteúdo já foi trocado na lista: cada um desliza saindo da posição do outro */
+            int origem = (posicao == parEsquerdo) ? parEsquerdo + 1 : parEsquerdo;
+            centro.x = misturar(centroDaPosicao(origem), centroDaPosicao(posicao), deslize);
+            /* Um passa por cima e o outro por baixo, para os dois aparecerem no cruzamento */
+            float arco = sinf(PI * deslize) * ALTURA_DO_ARCO;
+            centro.y += (posicao == parEsquerdo) ? -arco : arco;
+            borda = COR_SANGUE;
+        }
+
+        desenharFotogramaDaTira(atual, recursos, centro, borda, efeitos->fonte);
+    }
+
+    /* Sem rótulos técnicos: o jogador vê os quadros acendendo e cruzando.
+       Só o fim ganha uma frase, porque é o momento da história */
+    if (terminou) {
+        desenharTextoVHS(efeitos->fonte, "O FILME ESTÁ COMPLETO", (Vector2){ LARGURA_VIRTUAL / 2.0f, TOPO_DA_TIRA - 26 },
+                         22, COR_AMBAR, ALINHAR_CENTRO);
+    }
 }
