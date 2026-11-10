@@ -267,12 +267,15 @@ static Vector2 olharDaLanterna(const EstadoDaLanterna *lanterna)
    Durante a partida, a cena passa pela lanterna; nas telas do menu,
    o texto vai direto para a folha quadro, sem escuridão.
    Recebe a partida, a opção do menu, os efeitos, os recursos, a lanterna,
-   a vista, o tempo de jogo, os sinais da criatura e a transição de sala.
+   a vista, o tempo de jogo, os sinais da criatura, a transição de sala,
+   a animação da ordenação e se o modo apresentação (F1) está ligado.
    Retorna o próximo estado escolhido nas telas do menu. */
 static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efeitos,
                                  const Recursos *recursos, const EstadoDaLanterna *lanterna,
                                  Vista vista, float tempo, SinaisCriatura sinais,
-                                 const TransicaoFita *transicao)
+                                 const TransicaoFita *transicao,
+                                 const AnimacaoOrdenacao *animacaoOrdenacao,
+                                 bool modoApresentacao)
 {
     EstadoJogo proximoEstado = partida->estadoAtual;
     float raioAtual = RAIO_LANTERNA * lanterna->intensidade;
@@ -302,7 +305,16 @@ static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efei
         if (criaturaNaPorta) {
             desenharOlhosCriatura(olhos.posicao, olhos.tamanho, tempo, lanterna->posicao, raioAtual);
         }
+        /* Na montagem, a tira de filme mostra a lista sendo ordenada */
+        if (partida->estadoAtual == ESTADO_MONTAGEM) {
+            desenharOrdenacao(partida, recursos, efeitos, animacaoOrdenacao);
+        }
         desenharHUD(partida, efeitos, transicao, tempo);
+        /* Modo apresentação: mostra as estruturas de dados por cima do jogo */
+        if (modoApresentacao) {
+            desenharMinimapa(partida, efeitos);
+            desenharPainelApresentacao(partida, efeitos);
+        }
     } else {
         proximoEstado = desenharTelaDoMenu(partida, opcaoMenu);
     }
@@ -351,10 +363,15 @@ int main(void)
     int opcaoMenu = 0;
     float esperaProximoPasso = 0;
     AnimacaoOrdenacao animacaoOrdenacao = { false, PASSO_FIM, 0.0f };
+    bool modoApresentacao = false;      /* F1 mostra as listas e a ordenação, para a apresentação */
 
     while (!WindowShouldClose() && partida.estadoAtual != ESTADO_SAIR) {
         float tempo = (float)GetTime();
         float segundosDoQuadro = GetFrameTime();
+
+        if (IsKeyPressed(KEY_F1)) {
+            modoApresentacao = !modoApresentacao;
+        }
 
         /* Primeiro a lógica do quadro; o desenho vem depois, já com o estado novo */
         if (partida.estadoAtual == ESTADO_JOGANDO) {
@@ -383,7 +400,8 @@ int main(void)
         Vista vista = calcularVista(olharDaLanterna(&lanterna), tempo, sinais.tremorCamera);
 
         EstadoJogo proximoEstado = desenharQuadro(&partida, &opcaoMenu, &efeitos, &recursos,
-                                                  &lanterna, vista, tempo, sinais, &transicao);
+                                                  &lanterna, vista, tempo, sinais, &transicao,
+                                                  &animacaoOrdenacao, modoApresentacao);
         mudarDeEstado(&partida, proximoEstado, &transicao);
     }
 

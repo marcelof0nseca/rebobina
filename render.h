@@ -61,9 +61,17 @@ typedef struct {
    Retorna true se a criatura apareceu numa porta. */
 bool desenharCriatura(const Partida *partida, Vista vista, float tempo, OlhosDaCriatura *olhos);
 
-/* Desenha as salas em círculo, lendo direto da lista circular.
-   Recebe a partida. Não retorna nada. */
-void desenharMinimapa(const Partida *partida);
+/* Desenha as salas em círculo, lendo direto da lista circular: o jogador,
+   a criatura e os fotogramas que ainda estão no chão. Faz parte do modo
+   apresentação (F1), que mostra as estruturas de dados funcionando.
+   Recebe a partida e os efeitos (para a fonte). Não retorna nada. */
+void desenharMinimapa(const Partida *partida, const Efeitos *efeitos);
+
+/* Desenha o painel do modo apresentação (F1): o tamanho da lista circular,
+   a distância da criatura, o ruído, a lista de fotogramas coletados e,
+   na montagem, o algoritmo pelo nome técnico e os contadores.
+   Recebe a partida e os efeitos (para a fonte). Não retorna nada. */
+void desenharPainelApresentacao(const Partida *partida, const Efeitos *efeitos);
 
 /* Desenha a interface por cima da imagem: REC, modo da fita, contador,
    nome da sala e das vizinhas, fotogramas coletados e as instruções.
@@ -82,8 +90,12 @@ typedef struct {
     float progresso;          /* 0 = o passo acabou de acontecer, 1 = hora do próximo */
 } AnimacaoOrdenacao;
 
-/* Desenha os fotogramas e destaca o par que a ordenação está comparando.
-   Recebe a partida e os recursos. Não retorna nada. */
-void desenharOrdenacao(const Partida *partida, const Recursos *recursos);
+/* Desenha a tira de filme da montagem: os fotogramas na ordem atual da lista,
+   o par que está sendo comparado e os dois deslizando quando trocam.
+   Deve ser chamada dentro da folha quadro, depois da lanterna.
+   Recebe a partida, os recursos (as imagens dos fotogramas, se carregadas),
+   os efeitos (para a fonte) e a animação do último passo. Não retorna nada. */
+void desenharOrdenacao(const Partida *partida, const Recursos *recursos,
+                       const Efeitos *efeitos, const AnimacaoOrdenacao *animacao);
 
 #endif
