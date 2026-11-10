@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include "regras.h"
 #include "criatura.h"
+#include "fotogramas.h"
 
 /* Soma o barulho de uma ação. Quando o total atinge o limite,
    a criatura anda uma sala e o ruído acumulado volta a zero.
@@ -43,11 +44,20 @@ int verificarCaptura(const Partida *partida)
     return partida->salaCriatura == partida->salaJogador;
 }
 
-/* CASCA: confere se os fotogramas foram coletados e ordenados */
+/* Confere se os fotogramas foram todos coletados e estão em ordem.
+   Recebe a partida.
+   Retorna 1 se o jogador venceu, 0 se não. */
 int verificarVitoria(const Partida *partida)
 {
-    (void)partida;
-    return 0;
+    if (partida == NULL) {
+        return 0;
+    }
+
+    /* Os dois juntos: estaOrdenado sozinho daria 1 para uma lista vazia */
+    if (partida->totalColetados != TOTAL_FOTOGRAMAS) {
+        return 0;
+    }
+    return estaOrdenado(partida->fotogramasColetados);
 }
 
 /* CASCA: libera a partida anterior e monta tudo de novo */
