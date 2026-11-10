@@ -146,28 +146,36 @@ static TipoPasso executarPassoDaOrdenacao(Partida *partida)
 
 /* Atualiza a montagem do filme: espera o jogador escolher o algoritmo
    e depois executa um passo da ordenação a cada INTERVALO_PASSO segundos.
-   Recebe a partida, os comandos do jogador, quantos segundos durou o quadro
-   e quanto falta para o próximo passo (atualizado aqui).
+   Recebe a partida, os comandos do jogador, quantos segundos durou o quadro,
+   quanto falta para o próximo passo e a animação (os dois atualizados aqui).
    Retorna o próximo estado. */
 static EstadoJogo atualizarMontagem(Partida *partida, ComandosDoJogador comandos,
-                                    float segundosDoQuadro, float *esperaProximoPasso)
+                                    float segundosDoQuadro, float *esperaProximoPasso,
+                                    AnimacaoOrdenacao *animacao)
 {
     if (partida->ordenacao.algoritmo == ALGORITMO_NENHUM) {
         if (comandos.algoritmoEscolhido != ALGORITMO_NENHUM) {
             iniciarOrdenacao(&partida->ordenacao, comandos.algoritmoEscolhido);
             *esperaProximoPasso = INTERVALO_PASSO;
+            *animacao = (AnimacaoOrdenacao){ false, PASSO_FIM, 0.0f };
         }
         return ESTADO_MONTAGEM;
     }
 
     /* Um passo por vez, com intervalo, para o jogador ver os fotogramas trocando */
     *esperaProximoPasso -= segundosDoQuadro;
+    animacao->progresso = 1.0f - *esperaProximoPasso / INTERVALO_PASSO;
     if (*esperaProximoPasso > 0) {
         return ESTADO_MONTAGEM;
     }
     *esperaProximoPasso = INTERVALO_PASSO;
 
     TipoPasso passo = executarPassoDaOrdenacao(partida);
+
+    /* A animação mostra este passo até o próximo */
+    animacao->houvePasso = true;
+    animacao->ultimoPasso = passo;
+    animacao->progresso = 0.0f;
 
     /* A criatura continua vindo enquanto o filme é montado */
     if (verificarCaptura(partida)) {
@@ -342,6 +350,7 @@ int main(void)
     TransicaoFita transicao = { 0 };
     int opcaoMenu = 0;
     float esperaProximoPasso = 0;
+    AnimacaoOrdenacao animacaoOrdenacao = { false, PASSO_FIM, 0.0f };
 
     while (!WindowShouldClose() && partida.estadoAtual != ESTADO_SAIR) {
         float tempo = (float)GetTime();
@@ -353,8 +362,8 @@ int main(void)
                                                                 lerComandos(), segundosDoQuadro);
             mudarDeEstado(&partida, depoisDaExploracao, &transicao);
         } else if (partida.estadoAtual == ESTADO_MONTAGEM) {
-            EstadoJogo depoisDaMontagem = atualizarMontagem(&partida, lerComandos(),
-                                                            segundosDoQuadro, &esperaProximoPasso);
+            EstadoJogo depoisDaMontagem = atualizarMontagem(&partida, lerComandos(), segundosDoQuadro,
+                                                            &esperaProximoPasso, &animacaoOrdenacao);
             mudarDeEstado(&partida, depoisDaMontagem, &transicao);
         }
 

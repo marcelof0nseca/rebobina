@@ -74,6 +74,14 @@ void desenharMinimapa(const Partida *partida);
 void desenharHUD(const Partida *partida, const Efeitos *efeitos,
                  const TransicaoFita *transicao, float tempo);
 
+/* O que a animação da ordenação precisa saber e o EstadoOrdenacao não guarda:
+   o que o último passo fez e quanto tempo já passou desde ele */
+typedef struct {
+    bool houvePasso;          /* false até o primeiro passo depois da escolha do algoritmo */
+    TipoPasso ultimoPasso;    /* comparação, troca ou fim */
+    float progresso;          /* 0 = o passo acabou de acontecer, 1 = hora do próximo */
+} AnimacaoOrdenacao;
+
 /* Desenha os fotogramas e destaca o par que a ordenação está comparando.
    Recebe a partida e os recursos. Não retorna nada. */
 void desenharOrdenacao(const Partida *partida, const Recursos *recursos);
