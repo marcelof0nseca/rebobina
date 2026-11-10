@@ -1,18 +1,18 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c99 -g
 
-# O raylib usa bibliotecas diferentes em cada sistema
+# O raylib usa bibliotecas diferentes em cada sistema.
+# No Windows, use o w64devkit que vem no instalador do raylib: o make dele
+# roda os comandos num terminal estilo Linux, então rm e ./ funcionam igual.
 ifeq ($(OS),Windows_NT)
     LDLIBS = -lraylib -lopengl32 -lgdi32 -lwinmm
     EXTENSAO = .exe
-    APAGAR = del /Q /F
-    RODAR =
 else
     LDLIBS = -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
     EXTENSAO =
-    APAGAR = rm -f
-    RODAR = ./
 endif
+APAGAR = rm -f
+RODAR = ./
 
 JOGO = rebobina$(EXTENSAO)
 TESTE_SALAS = teste_salas$(EXTENSAO)
