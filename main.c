@@ -251,6 +251,22 @@ static void mudarDeEstado(Partida *partida, EstadoJogo proximoEstado, TransicaoF
     partida->estadoAtual = proximoEstado;
 }
 
+/* Segue para o estado que a exploração ou a montagem devolveu. A derrota
+   não troca na hora: antes, a criatura pula na câmera por DURACAO_CAPTURA
+   segundos, e só então o main troca para a tela de FIM DA FITA.
+   Recebe a partida, o estado devolvido, a transição de sala e o relógio
+   da captura (-1 = sem captura), que começa aqui. Não retorna nada. */
+static void seguirDepoisDaPartida(Partida *partida, EstadoJogo proximoEstado,
+                                  TransicaoFita *transicao, float *segundosDesdeCaptura)
+{
+    if (proximoEstado == ESTADO_DERROTA) {
+        *segundosDesdeCaptura = 0;
+        *transicao = (TransicaoFita){ 0 };   /* a fita para de rebobinar: agora é a criatura */
+        return;
+    }
+    mudarDeEstado(partida, proximoEstado, transicao);
+}
+
 /* Calcula para onde a câmera olha, a partir da posição da lanterna:
    de -1 (esquerda ou topo) a 1 (direita ou base) em cada eixo.
    Recebe a lanterna. Retorna a direção do olhar. */
@@ -268,14 +284,15 @@ static Vector2 olharDaLanterna(const EstadoDaLanterna *lanterna)
    o texto vai direto para a folha quadro, sem escuridão.
    Recebe a partida, a opção do menu, os efeitos, os recursos, a lanterna,
    a vista, o tempo de jogo, os sinais da criatura, a transição de sala,
-   a animação da ordenação e se o modo apresentação (F1) está ligado.
+   a animação da ordenação, se o modo apresentação (F1) está ligado
+   e há quantos segundos o jogador foi pego (-1 = não foi).
    Retorna o próximo estado escolhido nas telas do menu. */
 static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efeitos,
                                  const Recursos *recursos, const EstadoDaLanterna *lanterna,
                                  Vista vista, float tempo, SinaisCriatura sinais,
                                  const TransicaoFita *transicao,
                                  const AnimacaoOrdenacao *animacaoOrdenacao,
-                                 bool modoApresentacao)
+                                 bool modoApresentacao, float segundosDesdeCaptura)
 {
     EstadoJogo proximoEstado = partida->estadoAtual;
     float raioAtual = RAIO_LANTERNA * lanterna->intensidade;
@@ -296,7 +313,10 @@ static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efei
        nas telas do menu, o próprio menu */
     BeginTextureMode(efeitos->quadro);
     ClearBackground(BLACK);
-    if (estaEmPartida(partida->estadoAtual)) {
+    if (estaEmPartida(partida->estadoAtual) && segundosDesdeCaptura >= INICIO_DA_CRIATURA_NA_CAPTURA) {
+        /* Pego: a sala some e a criatura pula na câmera */
+        desenharCaptura(efeitos, segundosDesdeCaptura);
+    } else if (estaEmPartida(partida->estadoAtual)) {
         Vector3 fontesDeLuz[MAX_FONTES_DE_LUZ];
         int quantidadeFontes = fontesDeLuzDaSala(partida, tempo, vista, fontesDeLuz);
         desenharLanterna(efeitos, lanterna->posicao, raioAtual, lanterna->intensidade,
@@ -364,6 +384,7 @@ int main(void)
     float esperaProximoPasso = 0;
     AnimacaoOrdenacao animacaoOrdenacao = { false, PASSO_FIM, 0.0f };
     bool modoApresentacao = false;      /* F1 mostra as listas e a ordenação, para a apresentação */
+    float segundosDesdeCaptura = -1;    /* -1 = ninguém foi pego; a partir de 0, a cena da captura */
 
     while (!WindowShouldClose() && partida.estadoAtual != ESTADO_SAIR) {
         float tempo = (float)GetTime();
@@ -373,15 +394,22 @@ int main(void)
             modoApresentacao = !modoApresentacao;
         }
 
-        /* Primeiro a lógica do quadro; o desenho vem depois, já com o estado novo */
-        if (partida.estadoAtual == ESTADO_JOGANDO) {
+        /* Primeiro a lógica do quadro; o desenho vem depois, já com o estado novo.
+           Durante a captura a partida fica parada, só o relógio da cena anda */
+        if (segundosDesdeCaptura >= 0) {
+            segundosDesdeCaptura += segundosDoQuadro;
+            if (segundosDesdeCaptura >= DURACAO_CAPTURA) {
+                segundosDesdeCaptura = -1;
+                mudarDeEstado(&partida, ESTADO_DERROTA, &transicao);
+            }
+        } else if (partida.estadoAtual == ESTADO_JOGANDO) {
             EstadoJogo depoisDaExploracao = atualizarExploracao(&partida, &transicao,
                                                                 lerComandos(), segundosDoQuadro);
-            mudarDeEstado(&partida, depoisDaExploracao, &transicao);
+            seguirDepoisDaPartida(&partida, depoisDaExploracao, &transicao, &segundosDesdeCaptura);
         } else if (partida.estadoAtual == ESTADO_MONTAGEM) {
             EstadoJogo depoisDaMontagem = atualizarMontagem(&partida, lerComandos(), segundosDoQuadro,
                                                             &esperaProximoPasso, &animacaoOrdenacao);
-            mudarDeEstado(&partida, depoisDaMontagem, &transicao);
+            seguirDepoisDaPartida(&partida, depoisDaMontagem, &transicao, &segundosDesdeCaptura);
         }
 
         /* A distância vem da lista circular. Fora da partida ela é -1
@@ -391,6 +419,11 @@ int main(void)
             distancia = distanciaCircular(partida.salaJogador, partida.salaCriatura);
         }
         SinaisCriatura sinais = calcularSinaisCriatura(distancia);
+        if (segundosDesdeCaptura >= 0) {
+            /* Na captura, a fita falha e a câmera treme no máximo */
+            sinais.interferenciaFita = 1.0f;
+            sinais.tremorCamera = 1.0f;
+        }
 
         atualizarLanterna(&lanterna, tempo, sinais);
         atualizarPoeira(&efeitos, segundosDoQuadro);
@@ -401,7 +434,8 @@ int main(void)
 
         EstadoJogo proximoEstado = desenharQuadro(&partida, &opcaoMenu, &efeitos, &recursos,
                                                   &lanterna, vista, tempo, sinais, &transicao,
-                                                  &animacaoOrdenacao, modoApresentacao);
+                                                  &animacaoOrdenacao, modoApresentacao,
+                                                  segundosDesdeCaptura);
         mudarDeEstado(&partida, proximoEstado, &transicao);
     }
 
