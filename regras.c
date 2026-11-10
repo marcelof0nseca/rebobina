@@ -28,11 +28,19 @@ int atualizarRuido(Partida *partida, int ruidoDaAcao, int limite)
     return 0;
 }
 
-/* CASCA: confere se a criatura está na sala do jogador */
+/* Confere se a criatura está na mesma sala que o jogador.
+   Recebe a partida.
+   Retorna 1 se o jogador foi pego, 0 se não. */
 int verificarCaptura(const Partida *partida)
 {
-    (void)partida;
-    return 0;
+    if (partida == NULL || partida->salaCriatura == NULL) {
+        return 0;
+    }
+
+    /* Compara os ponteiros: mesmo nó da lista = mesma sala.
+       Com a partida zerada as duas salas são NULL, e o teste acima evita
+       que NULL == NULL conte como captura */
+    return partida->salaCriatura == partida->salaJogador;
 }
 
 /* CASCA: confere se os fotogramas foram coletados e ordenados */
