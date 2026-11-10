@@ -17,6 +17,7 @@ RODAR = ./
 JOGO = rebobina$(EXTENSAO)
 TESTE_SALAS = teste_salas$(EXTENSAO)
 TESTE_CRIATURA = teste_criatura$(EXTENSAO)
+TESTE_REGRAS = teste_regras$(EXTENSAO)
 
 FONTES = main.c salas.c render.c efeitos.c criatura.c regras.c          fotogramas.c ordenacao.c recursos.c menu.c
 OBJETOS = $(FONTES:.c=.o)
@@ -30,15 +31,17 @@ $(JOGO): $(OBJETOS)
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Compila e roda os testes de terminal (salas e criatura), sem raylib
-teste: teste_salas.c teste_criatura.c salas.c criatura.c salas.h criatura.h jogo.h
+# Compila e roda os testes de terminal (salas, criatura e regras), sem raylib
+teste: teste_salas.c teste_criatura.c teste_regras.c salas.c criatura.c regras.c fotogramas.c ordenacao.c $(HEADERS)
 	$(CC) $(CFLAGS) teste_salas.c salas.c -o $(TESTE_SALAS)
 	$(CC) $(CFLAGS) teste_criatura.c criatura.c salas.c -o $(TESTE_CRIATURA)
+	$(CC) $(CFLAGS) teste_regras.c regras.c criatura.c salas.c fotogramas.c ordenacao.c -o $(TESTE_REGRAS)
 	$(RODAR)$(TESTE_SALAS)
 	$(RODAR)$(TESTE_CRIATURA)
+	$(RODAR)$(TESTE_REGRAS)
 
 # Apaga o que foi gerado pela compilação
 clean:
-	$(APAGAR) $(OBJETOS) $(JOGO) $(TESTE_SALAS) $(TESTE_CRIATURA)
+	$(APAGAR) $(OBJETOS) $(JOGO) $(TESTE_SALAS) $(TESTE_CRIATURA) $(TESTE_REGRAS)
 
 .PHONY: clean teste
