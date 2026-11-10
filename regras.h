@@ -15,7 +15,7 @@
 #define RUIDO_COMPARAR 1
 #define RUIDO_TROCAR   2
 
-/* Soma o barulho de uma ação. Quando o total passa do limite,
+/* Soma o barulho de uma ação. Quando o total atinge o limite,
    a criatura anda uma sala e o ruído acumulado volta a zero.
    Recebe a partida, o barulho da ação e o limite da fase atual.
    Retorna 1 se a criatura andou, 0 se não. */
