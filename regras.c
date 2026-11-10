@@ -1,17 +1,30 @@
 /*
  * regras.c
  * Responsável: Lucca
- * CASCA: funções vazias só para o projeto compilar.
- * O Lucca substitui cada uma pela versão real.
+ * Ruído, captura, vitória e reinício da partida.
  */
+#include <stddef.h>
 #include "regras.h"
+#include "criatura.h"
 
-/* CASCA: soma o barulho e move a criatura quando passa do limite */
+/* Soma o barulho de uma ação. Quando o total atinge o limite,
+   a criatura anda uma sala e o ruído acumulado volta a zero.
+   Recebe a partida, o barulho da ação e o limite da fase atual.
+   Retorna 1 se a criatura andou, 0 se não. */
 int atualizarRuido(Partida *partida, int ruidoDaAcao, int limite)
 {
-    (void)partida;
-    (void)ruidoDaAcao;
-    (void)limite;
+    if (partida == NULL) {
+        return 0;
+    }
+
+    partida->ruidoAcumulado += ruidoDaAcao;
+
+    /* >= : com limite 4 e passos de 1, a criatura anda exatamente no 4º passo */
+    if (partida->ruidoAcumulado >= limite) {
+        partida->ruidoAcumulado = 0;    /* zera: a sobra não fica guardada */
+        moverCriatura(partida);         /* no máximo 1 sala por chamada */
+        return 1;
+    }
     return 0;
 }
 
