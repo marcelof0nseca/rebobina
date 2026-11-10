@@ -7,7 +7,7 @@
 
 /* Barulho acumulado para a criatura andar uma sala */
 #define LIMITE_RUIDO_EXPLORACAO 4
-#define LIMITE_RUIDO_MONTAGEM 7
+#define LIMITE_RUIDO_MONTAGEM 12
 
 /* Tamanho máximo dos textos, contando o '\0' */
 #define TAMANHO_NOME_SALA 32

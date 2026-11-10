@@ -115,17 +115,20 @@ static int testarRuido(void)
     falhas += conferir("coletar (2) + coletar (2) com limite 4: anda na segunda",
                        primeiraColeta == 0 && segundaColeta == 1 && partida.ruidoAcumulado == 0);
 
+    /* A montagem segue o LIMITE_RUIDO_MONTAGEM do jogo.h: se o limite
+       mudar no equilíbrio, o teste continua valendo sem editar números */
     andou = 0;
-    for (int comparacao = 0; comparacao < 6; comparacao++) {
+    for (int comparacao = 0; comparacao < LIMITE_RUIDO_MONTAGEM - 1; comparacao++) {
         andou += atualizarRuido(&partida, RUIDO_COMPARAR, LIMITE_RUIDO_MONTAGEM);
     }
-    falhas += conferir("montagem (limite 7): 6 comparações não andam", andou == 0);
+    falhas += conferir("montagem: limite - 1 comparações não andam", andou == 0);
     andou = atualizarRuido(&partida, RUIDO_COMPARAR, LIMITE_RUIDO_MONTAGEM);
-    falhas += conferir("montagem: a 7ª comparação anda", andou == 1 && partida.ruidoAcumulado == 0);
+    falhas += conferir("montagem: a comparação que atinge o limite anda e zera",
+                       andou == 1 && partida.ruidoAcumulado == 0);
 
-    partida.ruidoAcumulado = 6;
+    partida.ruidoAcumulado = LIMITE_RUIDO_MONTAGEM - 1;
     andou = atualizarRuido(&partida, RUIDO_TROCAR, LIMITE_RUIDO_MONTAGEM);
-    falhas += conferir("troca (2) com ruído 6: anda e zera (sem sobra)",
+    falhas += conferir("troca (2) com ruído limite - 1: anda e zera (sem sobra)",
                        andou == 1 && partida.ruidoAcumulado == 0);
 
     falhas += conferir("partida NULL: retorna 0",
