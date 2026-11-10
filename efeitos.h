@@ -16,6 +16,11 @@
 
 #define DURACAO_REBOBINAR 0.7f  /* segundos da fita rebobinando entre salas */
 
+/* Cena da captura: a criatura pula na câmera antes do FIM DA FITA */
+#define QUADROS_DA_CAPTURA 3
+#define DURACAO_CAPTURA 1.6f               /* segundos, do bote até a tela de derrota */
+#define INICIO_DA_CRIATURA_NA_CAPTURA 0.25f /* antes disso, só a fita falhando sobre a sala */
+
 /* Troca de sala com a fita rebobinando ou avançando.
    A sala muda na metade do efeito, quando a imagem está mais embaralhada */
 typedef struct {
@@ -80,9 +85,12 @@ typedef struct {
 
     Font fonte;
     bool fonteVeioDoArquivo;  /* só a fonte carregada do arquivo é liberada */
+
+    /* A criatura cada vez mais perto; id 0 se a imagem não foi encontrada */
+    Texture2D quadrosDaCaptura[QUADROS_DA_CAPTURA];
 } Efeitos;
 
-/* Cria as três folhas, carrega os dois shaders e a fonte.
+/* Cria as três folhas, carrega os dois shaders, a fonte e os quadros da captura.
    Deve ser chamada depois de InitWindow.
    Não recebe nada. Retorna os efeitos prontos para usar. */
 Efeitos carregarEfeitos(void);
@@ -166,6 +174,14 @@ float atualizarFalhaLanterna(FalhaLanterna *falha, float tempo, int chanceFalhaP
    e o raio da lanterna. Não retorna nada. */
 void desenharOlhosCriatura(Vector2 posicao, float tamanho, float tempo,
                            Vector2 posicaoLuz, float raioLuz);
+
+/* Desenha a cena da captura, no lugar da sala: a criatura parada piscando
+   no escuro, depois no meio do pulo e por fim com o rosto na câmera,
+   com zoom a partir dos olhos, tremor e um clarão vermelho. No fim, tela preta.
+   Sem as imagens, mostra só os olhos crescendo no escuro.
+   Deve ser chamada dentro de BeginTextureMode(efeitos->quadro).
+   Recebe os efeitos e os segundos desde a captura. Não retorna nada. */
+void desenharCaptura(const Efeitos *efeitos, float segundosDesdeCaptura);
 
 /* Escreve um texto com as cores levemente separadas, como numa fita gasta.
    Recebe a fonte, o texto, a posição, o tamanho, a cor e o alinhamento.
