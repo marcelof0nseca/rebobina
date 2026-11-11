@@ -263,11 +263,16 @@ static void mudarDeEstado(Partida *partida, EstadoJogo proximoEstado, TransicaoF
    Recebe a partida, o estado devolvido, a transição de sala e o relógio
    da captura (-1 = sem captura), que começa aqui. Não retorna nada. */
 static void seguirDepoisDaPartida(Partida *partida, EstadoJogo proximoEstado,
-                                  TransicaoFita *transicao, float *segundosDesdeCaptura)
+                                  TransicaoFita *transicao, float *segundosDesdeCaptura,
+                                  Recursos *recursos)
 {
     if (proximoEstado == ESTADO_DERROTA) {
+        if (recursos->jumpscare.stream.buffer != NULL) {
+            PlaySound(recursos->jumpscare);
+        }
+
         *segundosDesdeCaptura = 0;
-        *transicao = (TransicaoFita){ 0 };   /* a fita para de rebobinar: agora é a criatura */
+        *transicao = (TransicaoFita){ 0 };
         return;
     }
     mudarDeEstado(partida, proximoEstado, transicao);
@@ -434,11 +439,13 @@ int main(void)
         } else if (partida.estadoAtual == ESTADO_JOGANDO) {
             EstadoJogo depoisDaExploracao = atualizarExploracao(&partida, &transicao,
                                                                 lerComandos(), segundosDoQuadro);
-            seguirDepoisDaPartida(&partida, depoisDaExploracao, &transicao, &segundosDesdeCaptura);
+            seguirDepoisDaPartida(&partida, depoisDaExploracao, &transicao,
+                      &segundosDesdeCaptura, &recursos);
         } else if (partida.estadoAtual == ESTADO_MONTAGEM) {
             EstadoJogo depoisDaMontagem = atualizarMontagem(&partida, lerComandos(), segundosDoQuadro,
                                                             &esperaProximoPasso, &animacaoOrdenacao);
-            seguirDepoisDaPartida(&partida, depoisDaMontagem, &transicao, &segundosDesdeCaptura);
+            seguirDepoisDaPartida(&partida, depoisDaMontagem, &transicao,
+                      &segundosDesdeCaptura, &recursos);
         }
 
         /* A distância vem da lista circular. Fora da partida ela é -1
