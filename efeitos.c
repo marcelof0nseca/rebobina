@@ -63,6 +63,8 @@ static void carregarFonte(Efeitos *efeitos)
         codigos[posicao] = PRIMEIRO_CODIGO_FONTE + posicao;
     }
     efeitos->fonte = LoadFontEx(CAMINHO_FONTE, TAMANHO_FONTE, codigos, QUANTIDADE_CODIGOS_FONTE);
+    /* Filtro suave: a fonte é carregada grande e desenhada menor; sem ele as letras serrilham */
+    SetTextureFilter(efeitos->fonte.texture, TEXTURE_FILTER_BILINEAR);
     efeitos->fonteVeioDoArquivo = true;
 }
 
