@@ -57,6 +57,10 @@ int carregarRecursos(Recursos *recursos)
         /* imagensFotogramas[0] é o fotograma de ordem 1 */
         snprintf(caminho, sizeof(caminho), CAMINHO_IMAGENS "fotograma%d.png", i + 1);
         recursos->imagensFotogramas[i] = carregarTextura(caminho, &tudoOk);
+        if (recursos->imagensFotogramas[i].id != 0) {
+            /* Suave: a imagem aparece bem menor que o arquivo e serrilharia */
+            SetTextureFilter(recursos->imagensFotogramas[i], TEXTURE_FILTER_BILINEAR);
+        }
     }
 
     /* fundos[tipo] é a foto da sala daquele TipoCenario. O render projeta a foto
