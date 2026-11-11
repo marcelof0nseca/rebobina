@@ -287,18 +287,21 @@ static Vector2 olharDaLanterna(const EstadoDaLanterna *lanterna)
 
 /* Desenha um quadro inteiro nas três folhas e depois na janela.
    Durante a partida, a cena passa pela lanterna; nas telas do menu,
-   o texto vai direto para a folha quadro, sem escuridão.
+   o texto vai direto para a folha quadro, sem escuridão, com a fachada
+   do cinema atrás.
    Recebe a partida, a opção do menu, os efeitos, os recursos, a lanterna,
    a vista, o tempo de jogo, os sinais da criatura, a transição de sala,
-   a animação da ordenação, se o modo apresentação (F1) está ligado
-   e há quantos segundos o jogador foi pego (-1 = não foi).
+   a animação da ordenação, se o modo apresentação (F1) está ligado,
+   há quantos segundos o jogador foi pego (-1 = não foi) e há quantos
+   segundos a entrada no cinema começou (-1 = não começou).
    Retorna o próximo estado escolhido nas telas do menu. */
 static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efeitos,
                                  const Recursos *recursos, const EstadoDaLanterna *lanterna,
                                  Vista vista, float tempo, SinaisCriatura sinais,
                                  const TransicaoFita *transicao,
                                  const AnimacaoOrdenacao *animacaoOrdenacao,
-                                 bool modoApresentacao, float segundosDesdeCaptura)
+                                 bool modoApresentacao, float segundosDesdeCaptura,
+                                 float segundosDaEntrada)
 {
     EstadoJogo proximoEstado = partida->estadoAtual;
     float raioAtual = RAIO_LANTERNA * lanterna->intensidade;
@@ -342,7 +345,19 @@ static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efei
             desenharPainelApresentacao(partida, efeitos);
         }
     } else {
-        proximoEstado = desenharTelaDoMenu(partida, opcaoMenu);
+        /* Menu, Como jogar e Créditos ficam na frente do cinema; nas telas de texto,
+           a fachada fica bem escura para o texto continuar legível */
+        EstadoJogo estado = partida->estadoAtual;
+        if (estado == ESTADO_MENU || estado == ESTADO_COMO_JOGAR || estado == ESTADO_CREDITOS) {
+            desenharFachada(efeitos, tempo, segundosDaEntrada);
+            if (estado != ESTADO_MENU) {
+                DrawRectangle(0, 0, LARGURA_VIRTUAL, ALTURA_VIRTUAL, ColorAlpha(BLACK, 0.78f));
+            }
+        }
+        /* Durante a entrada as opções somem: só a câmera entrando pela porta */
+        if (segundosDaEntrada < 0) {
+            proximoEstado = desenharTelaDoMenu(partida, opcaoMenu);
+        }
     }
     EndTextureMode();
 
@@ -391,6 +406,7 @@ int main(void)
     AnimacaoOrdenacao animacaoOrdenacao = { false, PASSO_FIM, 0.0f };
     bool modoApresentacao = false;      /* F1 mostra as listas e a ordenação, para a apresentação */
     float segundosDesdeCaptura = -1;    /* -1 = ninguém foi pego; a partir de 0, a cena da captura */
+    float segundosDaEntrada = -1;       /* -1 = no menu; a partir de 0, a câmera entrando no cinema */
 
     while (!WindowShouldClose() && partida.estadoAtual != ESTADO_SAIR) {
         float tempo = (float)GetTime();
@@ -402,7 +418,14 @@ int main(void)
 
         /* Primeiro a lógica do quadro; o desenho vem depois, já com o estado novo.
            Durante a captura a partida fica parada, só o relógio da cena anda */
-        if (segundosDesdeCaptura >= 0) {
+        if (segundosDaEntrada >= 0) {
+            /* A entrada no cinema: só depois dela a partida começa, já no Saguão */
+            segundosDaEntrada += segundosDoQuadro;
+            if (segundosDaEntrada >= DURACAO_ENTRADA) {
+                segundosDaEntrada = -1;
+                mudarDeEstado(&partida, ESTADO_JOGANDO, &transicao);
+            }
+        } else if (segundosDesdeCaptura >= 0) {
             segundosDesdeCaptura += segundosDoQuadro;
             if (segundosDesdeCaptura >= DURACAO_CAPTURA) {
                 segundosDesdeCaptura = -1;
@@ -425,6 +448,10 @@ int main(void)
             distancia = distanciaCircular(partida.salaJogador, partida.salaCriatura);
         }
         SinaisCriatura sinais = calcularSinaisCriatura(distancia);
+        if (segundosDaEntrada >= 0) {
+            /* Entrando no cinema, a fita vai falhando cada vez mais */
+            sinais.interferenciaFita = fminf(segundosDaEntrada / DURACAO_ENTRADA, 1.0f);
+        }
         if (segundosDesdeCaptura >= 0) {
             /* Na captura, a fita falha e a câmera treme no máximo */
             sinais.interferenciaFita = 1.0f;
@@ -441,8 +468,13 @@ int main(void)
         EstadoJogo proximoEstado = desenharQuadro(&partida, &opcaoMenu, &efeitos, &recursos,
                                                   &lanterna, vista, tempo, sinais, &transicao,
                                                   &animacaoOrdenacao, modoApresentacao,
-                                                  segundosDesdeCaptura);
-        mudarDeEstado(&partida, proximoEstado, &transicao);
+                                                  segundosDesdeCaptura, segundosDaEntrada);
+        if (partida.estadoAtual == ESTADO_MENU && proximoEstado == ESTADO_JOGANDO) {
+            /* Escolheu Jogar: primeiro a câmera entra pela porta do cinema */
+            segundosDaEntrada = 0;
+        } else {
+            mudarDeEstado(&partida, proximoEstado, &transicao);
+        }
     }
 
     /* Primeiro a memória das listas, depois o que está na placa de vídeo;

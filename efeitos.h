@@ -21,6 +21,9 @@
 #define DURACAO_CAPTURA 1.6f               /* segundos, do bote até a tela de derrota */
 #define INICIO_DA_CRIATURA_NA_CAPTURA 0.25f /* antes disso, só a fita falhando sobre a sala */
 
+/* Entrada no cinema: ao escolher Jogar, a câmera avança pela porta da fachada */
+#define DURACAO_ENTRADA 1.5f               /* segundos, do menu até o Saguão */
+
 /* Troca de sala com a fita rebobinando ou avançando.
    A sala muda na metade do efeito, quando a imagem está mais embaralhada */
 typedef struct {
@@ -90,9 +93,11 @@ typedef struct {
     Texture2D quadrosDaCaptura[QUADROS_DA_CAPTURA];
     /* A mesma criatura, de corpo inteiro e fundo transparente, parada na porta */
     Texture2D criaturaNaPorta;
+    /* A fachada do cinema à noite, atrás do menu; id 0 se não foi encontrada */
+    Texture2D fachadaDoMenu;
 } Efeitos;
 
-/* Cria as três folhas, carrega os dois shaders, a fonte e as imagens da criatura.
+/* Cria as três folhas, carrega os dois shaders, a fonte, as imagens da criatura e a fachada.
    Deve ser chamada depois de InitWindow.
    Não recebe nada. Retorna os efeitos prontos para usar. */
 Efeitos carregarEfeitos(void);
@@ -185,6 +190,15 @@ void desenharOlhosCriatura(Vector2 posicao, float tamanho, float tempo,
    Deve ser chamada dentro de BeginTextureMode(efeitos->quadro).
    Recebe os efeitos e os segundos desde a captura. Não retorna nada. */
 void desenharCaptura(const Efeitos *efeitos, float segundosDesdeCaptura);
+
+/* Desenha a fachada do cinema atrás do menu, com a câmera balançando de leve
+   e as lâmpadas da marquise oscilando. Durante a entrada, a câmera avança
+   pela porta aberta, acelerando, até a tela ficar preta.
+   Sem a imagem, não desenha nada (fica o fundo preto).
+   Deve ser chamada dentro de BeginTextureMode(efeitos->quadro).
+   Recebe os efeitos, o tempo de jogo e os segundos desde que a entrada
+   começou (negativo = parado no menu). Não retorna nada. */
+void desenharFachada(const Efeitos *efeitos, float tempo, float segundosDaEntrada);
 
 /* Escreve um texto com as cores levemente separadas, como numa fita gasta.
    Recebe a fonte, o texto, a posição, o tamanho, a cor e o alinhamento.
