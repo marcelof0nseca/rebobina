@@ -170,8 +170,9 @@ SinaisCriatura calcularSinaisCriatura(int distancia);
 float atualizarFalhaLanterna(FalhaLanterna *falha, float tempo, int chanceFalhaPorMil);
 
 /* Desenha os olhos vermelhos da criatura, depois da lanterna.
-   No escuro eles brilham fraco; dentro da luz da lanterna, brilham forte.
-   A cada 4 segundos a criatura pisca.
+   Mesmo no escuro eles brilham bem, com um halo que respira devagar:
+   é o aviso para o jogador ver onde ela está e fugir. Dentro da luz
+   da lanterna, brilham ainda mais. A cada 4 segundos a criatura pisca.
    Recebe a posição e o tamanho dos olhos, o tempo de jogo e o centro
    e o raio da lanterna. Não retorna nada. */
 void desenharOlhosCriatura(Vector2 posicao, float tamanho, float tempo,
