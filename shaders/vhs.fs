@@ -30,6 +30,9 @@ float ruido(vec2 p)
 
 // Brilho difuso (bloom): soma os pontos claros da vizinhança,
 // fazendo luzes fortes "vazarem" para fora do contorno.
+// São 3 anéis de 4 pontos, cada anel girado 45 graus em relação ao anterior:
+// 12 leituras por pixel em vez de 24, com o mesmo resultado na tela.
+// É a parte mais pesada do shader; sem placa de vídeo (WSL), faz diferença.
 vec3 brilhoDifuso(vec2 uv)
 {
     vec2 pixel = 1.0 / resolucao;
@@ -37,15 +40,15 @@ vec3 brilhoDifuso(vec2 uv)
     for (int anel = 1; anel <= 3; anel++)
     {
         float raio = float(anel) * 5.0;
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < 4; i++)
         {
-            float angulo = float(i) * 0.785398 + float(anel) * 0.39;
+            float angulo = float(i) * 1.570796 + float(anel) * 0.785398;
             vec3 amostra = texture(texture0, uv + vec2(cos(angulo), sin(angulo)) * raio * pixel).rgb;
             float claridade = dot(amostra, vec3(0.299, 0.587, 0.114));
             soma += amostra * smoothstep(0.45, 0.9, claridade) / float(anel);
         }
     }
-    return soma / 8.0;
+    return soma / 4.0;
 }
 
 void main()
