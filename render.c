@@ -28,6 +28,22 @@
    para cobrirem a tela inteira mesmo quando a vista se desloca */
 #define PROFUNDIDADE_INICIAL -0.35f
 
+/* Portas da sala desenhada em código: na parede lateral, entre estas profundidades */
+#define INICIO_DA_PORTA 0.25f
+#define FIM_DA_PORTA    0.69f
+#define TOPO_DA_PORTA   0.22f
+
+/* Foto da sala: cada superfície é cortada em faixas, da profundidade mínima
+   (atrás da câmera, para cobrir a tela quando a vista se desloca) até o fundo.
+   O plano perto da foto é a parede do fundo ampliada 2x em volta do ponto de fuga */
+#define FAIXAS_DA_FOTO 28
+#define PROFUNDIDADE_MINIMA_DA_FOTO -0.6f
+#define AFASTAMENTO_DA_FOTO 2.0f
+#define LUZES_POR_FOTO 2
+/* A foto aparece ampliada em volta do centro da tela: quando a câmera olha
+   para um lado, ainda sobra imagem na borda (sem isso, a borda se repetia em riscos) */
+#define AMPLIACAO_DA_FOTO 1.08f
+
 #define FAIXAS_DO_CHAO 14
 #define TABUAS_DO_CHAO 8
 #define MANCHAS_DE_NEVOA 7
@@ -84,6 +100,14 @@ static float misturar(float inicio, float fim, float fracao)
     return inicio + (fim - inicio) * fracao;
 }
 
+/* Mistura dois pontos; fracao = 0 devolve o primeiro, 1 devolve o segundo.
+   Recebe os dois pontos e a fração. Retorna o ponto misturado. */
+static Vector2 misturarPontos(Vector2 inicio, Vector2 fim, float fracao)
+{
+    Vector2 resultado = { misturar(inicio.x, fim.x, fracao), misturar(inicio.y, fim.y, fracao) };
+    return resultado;
+}
+
 /* Mistura duas cores; fracao = 0 devolve a primeira, 1 devolve a segunda.
    Recebe as duas cores e a fração. Retorna a cor misturada. */
 static Color misturarCores(Color inicio, Color fim, float fracao)
@@ -124,21 +148,31 @@ static void terminarCamada(void)
     rlPopMatrix();
 }
 
-/* Devolve onde um ponto da sala aparece na tela.
+/* Devolve onde um ponto da sala fica com a câmera parada (sem deslocamento).
+   Na foto, é também o ponto da imagem que corresponde a esse lugar da sala.
+   Recebe a geometria, a profundidade e as frações da largura e da altura.
+   Retorna o ponto na tela virtual. */
+static Vector2 pontoParado(const Geometria *geometria, float profundidade,
+                           float fracaoLargura, float fracaoAltura)
+{
+    Vector2 cantos[4];
+    for (int canto = 0; canto < 4; canto++) {
+        cantos[canto] = misturarPontos(geometria->perto[canto], geometria->fundo[canto], profundidade);
+    }
+    Vector2 topo = misturarPontos(cantos[0], cantos[1], fracaoLargura);
+    Vector2 base = misturarPontos(cantos[3], cantos[2], fracaoLargura);
+    return misturarPontos(topo, base, fracaoAltura);
+}
+
+/* Devolve onde um ponto da sala aparece na tela, com o deslocamento da vista.
    Recebe a vista, a profundidade e as frações da largura e da altura.
    Retorna o ponto na tela virtual. */
 static Vector2 pontoNaSala(Vista vista, float profundidade, float fracaoLargura, float fracaoAltura)
 {
-    float esquerda = misturar(0, FUNDO_ESQUERDA, profundidade);
-    float direita = misturar(LARGURA_VIRTUAL, FUNDO_DIREITA, profundidade);
-    float topo = misturar(0, FUNDO_TOPO, profundidade);
-    float base = misturar(ALTURA_VIRTUAL, FUNDO_BASE, profundidade);
+    Vector2 ponto = pontoParado(&vista.geometria, profundidade, fracaoLargura, fracaoAltura);
     Vector2 deslocamento = deslocamentoNaProfundidade(vista, profundidade);
-
-    Vector2 ponto = {
-        misturar(esquerda, direita, fracaoLargura) + deslocamento.x,
-        misturar(topo, base, fracaoAltura) + deslocamento.y
-    };
+    ponto.x += deslocamento.x;
+    ponto.y += deslocamento.y;
     return ponto;
 }
 
@@ -161,15 +195,20 @@ static void desenharQuadrilatero(Vector2 cantoA, Vector2 cantoB, Vector2 cantoC,
 }
 
 /* Calcula os 4 cantos da porta da esquerda (lado = -1) ou da direita (lado = 1).
-   A porta fica na parede lateral, entre as profundidades 0,25 e 0,69.
+   A porta fica na parede lateral, nas profundidades e na altura da geometria
+   da vista (na foto, onde a porta aparece na imagem).
    Recebe a vista, o lado e o vetor onde os cantos são guardados. Não retorna nada. */
 static void pontosDaPorta(Vista vista, int lado, Vector2 cantos[4])
 {
-    float fracaoLargura = (lado < 0) ? 0.0f : 1.0f;
-    cantos[0] = pontoNaSala(vista, 0.25f, fracaoLargura, 0.22f);
-    cantos[1] = pontoNaSala(vista, 0.69f, fracaoLargura, 0.22f);
-    cantos[2] = pontoNaSala(vista, 0.69f, fracaoLargura, 1.0f);
-    cantos[3] = pontoNaSala(vista, 0.25f, fracaoLargura, 1.0f);
+    int indice = (lado < 0) ? 0 : 1;
+    float fracaoLargura = (float)indice;
+    float inicio = vista.geometria.inicioDaPorta[indice];
+    float fim = vista.geometria.fimDaPorta[indice];
+    float topo = vista.geometria.topoDaPorta[indice];
+    cantos[0] = pontoNaSala(vista, inicio, fracaoLargura, topo);
+    cantos[1] = pontoNaSala(vista, fim, fracaoLargura, topo);
+    cantos[2] = pontoNaSala(vista, fim, fracaoLargura, 1.0f);
+    cantos[3] = pontoNaSala(vista, inicio, fracaoLargura, 1.0f);
 }
 
 /* Desenha teto, paredes laterais, chão com degradê e tábuas, parede do fundo,
@@ -628,6 +667,189 @@ static void desenharFotogramaNoChao(float tempo, Vista vista)
     terminarCamada();
 }
 
+/* Medidas de cada foto de sala, em pixels da imagem de 960 x 540, tiradas
+   da própria foto: a parede do fundo, o ponto de fuga, as duas portas
+   ([0] esquerda, [1] direita) e as luzes que aparecem nela (x, y, raio;
+   raio 0 = sem luz). É com elas que a criatura aparece dentro da porta da foto */
+typedef struct {
+    Vector2 fundo[4];
+    Vector2 pontoDeFuga;
+    float inicioDaPorta[2];
+    float fimDaPorta[2];
+    float topoDaPorta[2];
+    Vector3 luzes[LUZES_POR_FOTO];
+} SalaFotografada;
+
+static const SalaFotografada SALAS_FOTOGRAFADAS[TOTAL_CENARIOS] = {
+    [CENARIO_BILHETERIA] = {
+        { { 221, 110 }, { 736, 110 }, { 738, 386 }, { 220, 390 } }, { 479, 222 },
+        { 0.33f, 0.31f }, { 0.74f, 0.74f }, { 0.21f, 0.21f },
+        { { 481, 246, 170 }, { 0, 0, 0 } }                /* o guichê */
+    },
+    [CENARIO_SAGUAO] = {
+        { { 206, 100 }, { 752, 100 }, { 749, 364 }, { 209, 364 } }, { 479, 208 },
+        { 0.42f, 0.42f }, { 0.80f, 0.81f }, { 0.22f, 0.22f },
+        { { 236, 181, 95 }, { 726, 181, 95 } }            /* os dois painéis dourados */
+    },
+    [CENARIO_EXIBICAO] = {
+        { { 201, 51 }, { 761, 52 }, { 772, 369 }, { 193, 366 } }, { 481, 205 },
+        { 0.48f, 0.47f }, { 0.82f, 0.83f }, { 0.26f, 0.25f },
+        { { 483, 200, 260 }, { 0, 0, 0 } }                /* a tela */
+    },
+    [CENARIO_CORREDOR] = {
+        { { 203, 100 }, { 750, 100 }, { 747, 404 }, { 203, 406 } }, { 477, 243 },
+        { 0.43f, 0.41f }, { 0.81f, 0.81f }, { 0.24f, 0.24f },
+        { { 479, 184, 150 }, { 0, 0, 0 } }
+    },
+    [CENARIO_BANHEIRO] = {
+        { { 182, 98 }, { 776, 98 }, { 775, 426 }, { 183, 426 } }, { 479, 231 },
+        { 0.53f, 0.54f }, { 0.88f, 0.88f }, { 0.19f, 0.19f },
+        { { 485, 200, 120 }, { 0, 0, 0 } }                /* os espelhos */
+    },
+    [CENARIO_CABINE] = {
+        { { 204, 97 }, { 753, 97 }, { 753, 423 }, { 204, 423 } }, { 479, 234 },
+        { 0.42f, 0.42f }, { 0.81f, 0.81f }, { 0.21f, 0.21f },
+        { { 442, 190, 140 }, { 614, 283, 70 } }           /* a janelinha e o projetor */
+    },
+    [CENARIO_BOMBONIERE] = {
+        { { 204, 98 }, { 753, 98 }, { 762, 412 }, { 197, 412 } }, { 479, 228 },
+        { 0.43f, 0.42f }, { 0.81f, 0.82f }, { 0.21f, 0.21f },
+        { { 375, 249, 150 }, { 0, 0, 0 } }                /* a vitrine de pipoca */
+    },
+};
+
+/* Monta a geometria da sala desenhada em código: o fundo é o retângulo
+   FUNDO_* e o plano perto é a tela inteira.
+   Não recebe nada. Retorna a geometria. */
+static Geometria geometriaDesenhada(void)
+{
+    Geometria geometria = {
+        { { FUNDO_ESQUERDA, FUNDO_TOPO }, { FUNDO_DIREITA, FUNDO_TOPO },
+          { FUNDO_DIREITA, FUNDO_BASE }, { FUNDO_ESQUERDA, FUNDO_BASE } },
+        { { 0, 0 }, { LARGURA_VIRTUAL, 0 }, { LARGURA_VIRTUAL, ALTURA_VIRTUAL }, { 0, ALTURA_VIRTUAL } },
+        { INICIO_DA_PORTA, INICIO_DA_PORTA },
+        { FIM_DA_PORTA, FIM_DA_PORTA },
+        { TOPO_DA_PORTA, TOPO_DA_PORTA }
+    };
+    return geometria;
+}
+
+/* Diz se a foto da sala foi carregada.
+   Recebe a sala e os recursos (pode ser NULL). Retorna true se tem foto. */
+static bool salaTemFoto(const Sala *sala, const Recursos *recursos)
+{
+    return sala != NULL && recursos != NULL && recursos->fundos[sala->tipoCenario].id != 0;
+}
+
+/* Converte um ponto da foto para onde ele aparece na tela, com a foto
+   ampliada em volta do centro.
+   Recebe o ponto em pixels da foto. Retorna o ponto na tela virtual. */
+static Vector2 pontoDaFotoNaTela(Vector2 pontoDaFoto)
+{
+    Vector2 naTela = {
+        LARGURA_VIRTUAL / 2.0f + (pontoDaFoto.x - LARGURA_VIRTUAL / 2.0f) * AMPLIACAO_DA_FOTO,
+        ALTURA_VIRTUAL / 2.0f + (pontoDaFoto.y - ALTURA_VIRTUAL / 2.0f) * AMPLIACAO_DA_FOTO
+    };
+    return naTela;
+}
+
+/* O contrário de pontoDaFotoNaTela: de um ponto da tela para o ponto da foto.
+   Recebe o ponto na tela virtual. Retorna o ponto em pixels da foto. */
+static Vector2 pontoDaTelaNaFoto(Vector2 naTela)
+{
+    Vector2 pontoDaFoto = {
+        LARGURA_VIRTUAL / 2.0f + (naTela.x - LARGURA_VIRTUAL / 2.0f) / AMPLIACAO_DA_FOTO,
+        ALTURA_VIRTUAL / 2.0f + (naTela.y - ALTURA_VIRTUAL / 2.0f) / AMPLIACAO_DA_FOTO
+    };
+    return pontoDaFoto;
+}
+
+/* Troca a geometria da vista pela da foto da sala, se ela tiver foto:
+   o plano perto é a parede do fundo ampliada em volta do ponto de fuga.
+   Recebe a vista, a sala e os recursos. Retorna a vista ajustada. */
+static Vista vistaDaSala(Vista vista, const Sala *sala, const Recursos *recursos)
+{
+    if (!salaTemFoto(sala, recursos)) {
+        return vista;
+    }
+
+    const SalaFotografada *foto = &SALAS_FOTOGRAFADAS[sala->tipoCenario];
+    Vector2 fuga = pontoDaFotoNaTela(foto->pontoDeFuga);
+    for (int canto = 0; canto < 4; canto++) {
+        Vector2 doFundo = pontoDaFotoNaTela(foto->fundo[canto]);
+        vista.geometria.fundo[canto] = doFundo;
+        vista.geometria.perto[canto] = (Vector2){ fuga.x + AFASTAMENTO_DA_FOTO * (doFundo.x - fuga.x),
+                                                  fuga.y + AFASTAMENTO_DA_FOTO * (doFundo.y - fuga.y) };
+    }
+    for (int lado = 0; lado < 2; lado++) {
+        vista.geometria.inicioDaPorta[lado] = foto->inicioDaPorta[lado];
+        vista.geometria.fimDaPorta[lado] = foto->fimDaPorta[lado];
+        vista.geometria.topoDaPorta[lado] = foto->topoDaPorta[lado];
+    }
+    return vista;
+}
+
+/* Um vértice da foto: a posição na tela leva o deslocamento da vista, e o
+   ponto da imagem vem da posição parada (a foto é a sala vista parada).
+   Recebe a vista, a profundidade e as frações da largura e da altura.
+   Não retorna nada. */
+static void verticeDaFoto(Vista vista, float profundidade, float fracaoLargura, float fracaoAltura)
+{
+    Vector2 naImagem = pontoDaTelaNaFoto(pontoParado(&vista.geometria, profundidade, fracaoLargura, fracaoAltura));
+    Vector2 naTela = pontoNaSala(vista, profundidade, fracaoLargura, fracaoAltura);
+    rlTexCoord2f(naImagem.x / LARGURA_VIRTUAL, naImagem.y / ALTURA_VIRTUAL);
+    rlVertex2f(naTela.x, naTela.y);
+}
+
+/* Desenha a foto da sala projetada nas 5 superfícies: teto, as duas paredes
+   e o chão em faixas (cada faixa se move com a sua profundidade) e o fundo.
+   Assim a foto ganha a mesma profundidade da sala desenhada em código.
+   Recebe a foto e a vista (já com a geometria da foto). Não retorna nada. */
+static void desenharFotoDaSala(Texture2D foto, Vista vista)
+{
+    /* As faixas das paredes ficam em sentidos opostos; sem isto, metade sumiria */
+    rlDisableBackfaceCulling();
+    rlSetTexture(foto.id);
+    rlBegin(RL_QUADS);
+    rlColor4ub(255, 255, 255, 255);
+
+    for (int faixa = 0; faixa < FAIXAS_DA_FOTO; faixa++) {
+        float perto = misturar(PROFUNDIDADE_MINIMA_DA_FOTO, 1.0f, (float)faixa / FAIXAS_DA_FOTO);
+        float longe = misturar(PROFUNDIDADE_MINIMA_DA_FOTO, 1.0f, (float)(faixa + 1) / FAIXAS_DA_FOTO);
+
+        /* Teto */
+        verticeDaFoto(vista, perto, 0, 0);
+        verticeDaFoto(vista, longe, 0, 0);
+        verticeDaFoto(vista, longe, 1, 0);
+        verticeDaFoto(vista, perto, 1, 0);
+        /* Parede da esquerda */
+        verticeDaFoto(vista, perto, 0, 0);
+        verticeDaFoto(vista, perto, 0, 1);
+        verticeDaFoto(vista, longe, 0, 1);
+        verticeDaFoto(vista, longe, 0, 0);
+        /* Parede da direita */
+        verticeDaFoto(vista, longe, 1, 0);
+        verticeDaFoto(vista, longe, 1, 1);
+        verticeDaFoto(vista, perto, 1, 1);
+        verticeDaFoto(vista, perto, 1, 0);
+        /* Chão */
+        verticeDaFoto(vista, longe, 0, 1);
+        verticeDaFoto(vista, perto, 0, 1);
+        verticeDaFoto(vista, perto, 1, 1);
+        verticeDaFoto(vista, longe, 1, 1);
+    }
+
+    /* Parede do fundo */
+    verticeDaFoto(vista, 1, 0, 0);
+    verticeDaFoto(vista, 1, 0, 1);
+    verticeDaFoto(vista, 1, 1, 1);
+    verticeDaFoto(vista, 1, 1, 0);
+
+    rlEnd();
+    rlSetTexture(0);
+    rlEnableBackfaceCulling();
+}
+
 /* Acrescenta uma fonte de luz ao vetor, se ainda couber.
    A posição é dada sem deslocamento e recebe o deslocamento da sua profundidade,
    para a luz ficar em cima do objeto quando a câmera se move.
@@ -648,9 +870,9 @@ static void acrescentarFonte(Vector3 fontes[MAX_FONTES_DE_LUZ], int *quantidade,
 /* Preenche as luzes fixas da sala atual (tela, lâmpada, letreiro, vitrine...)
    e a do fotograma no chão, se houver, no formato (x, y, raio) que o shader
    da lanterna usa. Nunca passa de MAX_FONTES_DE_LUZ.
-   Recebe a partida, o tempo de jogo, a vista e o vetor a preencher.
-   Retorna quantas fontes foram preenchidas. */
-int fontesDeLuzDaSala(const Partida *partida, float tempo, Vista vista,
+   Recebe a partida, os recursos (pode ser NULL), o tempo de jogo, a vista
+   e o vetor a preencher. Retorna quantas fontes foram preenchidas. */
+int fontesDeLuzDaSala(const Partida *partida, const Recursos *recursos, float tempo, Vista vista,
                       Vector3 fontes[MAX_FONTES_DE_LUZ])
 {
     int quantidade = 0;
@@ -659,34 +881,45 @@ int fontesDeLuzDaSala(const Partida *partida, float tempo, Vista vista,
         return 0;
     }
 
-    /* As luzes que falham usam as mesmas funções do desenho:
-       quando o letreiro apaga na tela, a luz dele apaga junto */
-    switch (sala->tipoCenario) {
-        case CENARIO_EXIBICAO:
-            acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 215 }, 1, 260);
-            break;
-        case CENARIO_CORREDOR:
-        case CENARIO_SAGUAO:
-            if (lampadaAcesa(tempo)) {
-                acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 90 }, 0.9f, 150);
+    /* Com foto, as luzes são as que aparecem nela, na parede do fundo */
+    if (salaTemFoto(sala, recursos)) {
+        const SalaFotografada *foto = &SALAS_FOTOGRAFADAS[sala->tipoCenario];
+        for (int luz = 0; luz < LUZES_POR_FOTO; luz++) {
+            if (foto->luzes[luz].z > 0) {
+                Vector2 naTela = pontoDaFotoNaTela((Vector2){ foto->luzes[luz].x, foto->luzes[luz].y });
+                acrescentarFonte(fontes, &quantidade, vista, naTela, 1, foto->luzes[luz].z * AMPLIACAO_DA_FOTO);
             }
-            break;
-        case CENARIO_CABINE:
-            acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 195 }, 1, 140);
-            acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 604, 254 }, 0.75f, 70);
-            break;
-        case CENARIO_BILHETERIA:
-            if (neonBilheteriaAceso(tempo)) {
-                acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 142 }, 1, 170);
-            }
-            break;
-        case CENARIO_BOMBONIERE:
-            acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 385, 255 }, 1, 150);
-            break;
-        case CENARIO_BANHEIRO:
-            /* Luz fraca: um raio pequeno sobre os espelhos */
-            acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 185 }, 1, 110);
-            break;
+        }
+    } else {
+        /* Sem foto, as luzes que falham usam as mesmas funções do desenho:
+           quando o letreiro apaga na tela, a luz dele apaga junto */
+        switch (sala->tipoCenario) {
+            case CENARIO_EXIBICAO:
+                acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 215 }, 1, 260);
+                break;
+            case CENARIO_CORREDOR:
+            case CENARIO_SAGUAO:
+                if (lampadaAcesa(tempo)) {
+                    acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 90 }, 0.9f, 150);
+                }
+                break;
+            case CENARIO_CABINE:
+                acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 195 }, 1, 140);
+                acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 604, 254 }, 0.75f, 70);
+                break;
+            case CENARIO_BILHETERIA:
+                if (neonBilheteriaAceso(tempo)) {
+                    acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 142 }, 1, 170);
+                }
+                break;
+            case CENARIO_BOMBONIERE:
+                acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 385, 255 }, 1, 150);
+                break;
+            case CENARIO_BANHEIRO:
+                /* Luz fraca: um raio pequeno sobre os espelhos */
+                acrescentarFonte(fontes, &quantidade, vista, (Vector2){ 480, 185 }, 1, 110);
+                break;
+        }
     }
 
     if (sala->fotogramaNoChao != NULL) {
@@ -717,6 +950,7 @@ Vista calcularVista(Vector2 olhar, float tempo, float tremor)
     }
 
     Vista vista;
+    vista.geometria = geometriaDesenhada();
     vista.fundo.x = -olhar.x * 10 + balanco.x * 0.5f + sacudida.x * 0.5f;
     vista.fundo.y = -olhar.y * 6 + balanco.y * 0.5f + sacudida.y * 0.5f;
     vista.frente.x = -olhar.x * 30 + balanco.x * 1.5f + sacudida.x;
@@ -724,30 +958,35 @@ Vista calcularVista(Vector2 olhar, float tempo, float tremor)
     return vista;
 }
 
-/* Desenha a sala atual em perspectiva: teto, paredes, chão, portas e névoa.
+/* Desenha a sala atual em perspectiva: a foto da sala projetada no teto,
+   nas paredes, no chão e no fundo, ou, sem a foto, a sala desenhada em
+   código. Depois a névoa e o fotograma no chão.
    Deve ser chamada dentro de BeginTextureMode(efeitos.cena).
-   Recebe a partida, os recursos (para as imagens futuras; pode ser NULL),
+   Recebe a partida, os recursos (as fotos das salas; pode ser NULL),
    a vista e o tempo de jogo. Não retorna nada. */
 void desenharSala(const Partida *partida, const Recursos *recursos, Vista vista, float tempo)
 {
-    (void)recursos;   /* as imagens PNG do Vinicius entram aqui no futuro */
-
     const Sala *sala = partida->salaJogador;
     if (sala == NULL) {
         return;
     }
 
-    desenharParedesEChao(vista);
-
     /* O desenho vem do nó da lista circular em que o jogador está */
-    switch (sala->tipoCenario) {
-        case CENARIO_EXIBICAO: desenharSalaDeExibicao(tempo, vista); break;
-        case CENARIO_CORREDOR: desenharCorredor(tempo, vista); break;
-        case CENARIO_CABINE:   desenharCabine(tempo, vista); break;
-        case CENARIO_BILHETERIA: desenharBilheteria(tempo, vista); break;
-        case CENARIO_BOMBONIERE: desenharBomboniere(tempo, vista); break;
-        case CENARIO_SAGUAO:     desenharSaguao(tempo, vista); break;
-        case CENARIO_BANHEIRO:   desenharBanheiro(tempo, vista); break;
+    vista = vistaDaSala(vista, sala, recursos);
+    if (salaTemFoto(sala, recursos)) {
+        /* A foto já traz as paredes, as portas e os objetos da sala */
+        desenharFotoDaSala(recursos->fundos[sala->tipoCenario], vista);
+    } else {
+        desenharParedesEChao(vista);
+        switch (sala->tipoCenario) {
+            case CENARIO_EXIBICAO: desenharSalaDeExibicao(tempo, vista); break;
+            case CENARIO_CORREDOR: desenharCorredor(tempo, vista); break;
+            case CENARIO_CABINE:   desenharCabine(tempo, vista); break;
+            case CENARIO_BILHETERIA: desenharBilheteria(tempo, vista); break;
+            case CENARIO_BOMBONIERE: desenharBomboniere(tempo, vista); break;
+            case CENARIO_SAGUAO:     desenharSaguao(tempo, vista); break;
+            case CENARIO_BANHEIRO:   desenharBanheiro(tempo, vista); break;
+        }
     }
 
     desenharNevoa(tempo, vista);
@@ -760,14 +999,18 @@ void desenharSala(const Partida *partida, const Recursos *recursos, Vista vista,
 /* Desenha o vulto da criatura na porta, se ela estiver numa sala vizinha:
    na porta da direita se ela está em salaJogador->prox, na da esquerda
    se está em salaJogador->ant. Deve ser chamada dentro da folha cena.
-   Recebe a partida, a vista, o tempo de jogo e onde guardar os olhos.
-   Retorna true se a criatura apareceu numa porta. */
-bool desenharCriatura(const Partida *partida, Vista vista, float tempo, OlhosDaCriatura *olhos)
+   Recebe a partida, os recursos (pode ser NULL), a vista, o tempo de jogo
+   e onde guardar os olhos. Retorna true se a criatura apareceu numa porta. */
+bool desenharCriatura(const Partida *partida, const Recursos *recursos, Vista vista, float tempo,
+                      OlhosDaCriatura *olhos)
 {
     const Sala *sala = partida->salaJogador;
     if (sala == NULL || partida->salaCriatura == NULL) {
         return false;
     }
+
+    /* Com foto, as portas ficam onde aparecem na imagem */
+    vista = vistaDaSala(vista, sala, recursos);
 
     /* A porta vem direto dos ponteiros da lista circular */
     int lado;

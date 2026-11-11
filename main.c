@@ -310,7 +310,7 @@ static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efei
     ClearBackground(COR_FUNDO);
     if (estaEmPartida(partida->estadoAtual)) {
         desenharSala(partida, recursos, vista, tempo);
-        criaturaNaPorta = desenharCriatura(partida, vista, tempo, &olhos);
+        criaturaNaPorta = desenharCriatura(partida, recursos, vista, tempo, &olhos);
     }
     EndTextureMode();
 
@@ -324,7 +324,7 @@ static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efei
         desenharCaptura(efeitos, segundosDesdeCaptura);
     } else if (estaEmPartida(partida->estadoAtual)) {
         Vector3 fontesDeLuz[MAX_FONTES_DE_LUZ];
-        int quantidadeFontes = fontesDeLuzDaSala(partida, tempo, vista, fontesDeLuz);
+        int quantidadeFontes = fontesDeLuzDaSala(partida, recursos, tempo, vista, fontesDeLuz);
         desenharLanterna(efeitos, lanterna->posicao, raioAtual, lanterna->intensidade,
                          fontesDeLuz, quantidadeFontes);
         desenharPoeira(efeitos, lanterna->posicao, raioAtual, tempo);
