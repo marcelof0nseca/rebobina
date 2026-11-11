@@ -6,6 +6,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <time.h>
 #include "raylib.h"
 #include "jogo.h"
@@ -20,7 +21,7 @@
 #include "menu.h"
 
 #define RAIO_LANTERNA 230.0f
-#define SUAVIDADE_LANTERNA 0.12f   /* quanto a lanterna anda até o mouse por quadro */
+#define VELOCIDADE_LANTERNA 18.0f  /* quanto maior, mais rápido a lanterna alcança o mouse (~40 ms de atraso) */
 #define INTERVALO_PASSO 0.6f       /* segundos entre um passo e outro da ordenação */
 
 /* A lanterna do jogador: onde está, se está falhando e com que força ilumina */
@@ -191,12 +192,17 @@ static EstadoJogo atualizarMontagem(Partida *partida, ComandosDoJogador comandos
 
 /* Move a lanterna em direção ao mouse, com um pequeno atraso, como uma mão
    segurando, e sorteia as piscadas conforme a criatura se aproxima.
-   Recebe a lanterna, o tempo de jogo e os sinais da criatura. Não retorna nada. */
-static void atualizarLanterna(EstadoDaLanterna *lanterna, float tempo, SinaisCriatura sinais)
+   Recebe a lanterna, o tempo de jogo, quantos segundos durou o quadro
+   e os sinais da criatura. Não retorna nada. */
+static void atualizarLanterna(EstadoDaLanterna *lanterna, float tempo, float segundosDoQuadro,
+                              SinaisCriatura sinais)
 {
     Vector2 alvo = mouseNaTelaVirtual();
-    lanterna->posicao.x += (alvo.x - lanterna->posicao.x) * SUAVIDADE_LANTERNA;
-    lanterna->posicao.y += (alvo.y - lanterna->posicao.y) * SUAVIDADE_LANTERNA;
+    /* Quanto do caminho até o mouse ela anda neste quadro. Calculado pelo
+       tempo, e não por quadro: o atraso é o mesmo com 30 ou 144 quadros por segundo */
+    float fracao = 1.0f - expf(-VELOCIDADE_LANTERNA * segundosDoQuadro);
+    lanterna->posicao.x += (alvo.x - lanterna->posicao.x) * fracao;
+    lanterna->posicao.y += (alvo.y - lanterna->posicao.y) * fracao;
     lanterna->intensidade = atualizarFalhaLanterna(&lanterna->falha, tempo, sinais.chanceFalhaPorMil);
 }
 
@@ -425,7 +431,7 @@ int main(void)
             sinais.tremorCamera = 1.0f;
         }
 
-        atualizarLanterna(&lanterna, tempo, sinais);
+        atualizarLanterna(&lanterna, tempo, segundosDoQuadro, sinais);
         atualizarPoeira(&efeitos, segundosDoQuadro);
         tocarSomAmbiente(&recursos, distancia);
 
