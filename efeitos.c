@@ -18,6 +18,11 @@
 #define COR_BRILHO_OLHO    GetColor(0xd0262fff)
 #define COR_SEPARACAO_AZUL (Color){ 80, 200, 220, 80 }
 
+/* Olhos da criatura: o menor tamanho de cada olho e o menor raio do halo,
+   em pixels, para continuarem visíveis no escuro mesmo de longe */
+#define TAMANHO_MINIMO_OLHO     3.2f
+#define RAIO_MINIMO_HALO_OLHOS  30.0f
+
 /* Intensidade da lanterna no meio de uma piscada */
 #define INTENSIDADE_PISCANDO 0.3f
 
@@ -485,8 +490,9 @@ static float iluminacaoDaLanterna(Vector2 ponto, Vector2 posicaoLuz, float raioL
 }
 
 /* Desenha os olhos vermelhos da criatura, depois da lanterna.
-   No escuro eles brilham fraco; dentro da luz da lanterna, brilham forte.
-   A cada 4 segundos a criatura pisca.
+   Mesmo no escuro eles brilham bem, com um halo que respira devagar:
+   é o aviso para o jogador ver onde ela está e fugir. Dentro da luz
+   da lanterna, brilham ainda mais. A cada 4 segundos a criatura pisca.
    Recebe a posição e o tamanho dos olhos, o tempo de jogo e o centro
    e o raio da lanterna. Não retorna nada. */
 void desenharOlhosCriatura(Vector2 posicao, float tamanho, float tempo,
@@ -496,17 +502,26 @@ void desenharOlhosCriatura(Vector2 posicao, float tamanho, float tempo,
         return;
     }
 
-    /* No escuro sobra só um quinto do brilho: dá para notar, mas não salta aos olhos */
-    float brilho = 0.2f + 0.8f * iluminacaoDaLanterna(posicao, posicaoLuz, raioLuz);
+    /* No escuro ficam 80% do brilho; a lanterna completa o resto */
+    float brilho = 0.8f + 0.2f * iluminacaoDaLanterna(posicao, posicaoLuz, raioLuz);
+    float respiro = 0.8f + 0.2f * sinf(tempo * 2.0f);
+    /* Na porta a criatura fica pequena; os olhos não podem sumir por isso */
+    float tamanhoVisivel = fmaxf(tamanho, TAMANHO_MINIMO_OLHO);
+
+    /* Um halo em volta dos dois olhos, maior que eles: é o que se vê de longe */
+    BeginBlendMode(BLEND_ADDITIVE);
+    desenharCirculoDegrade(posicao, fmaxf(tamanhoVisivel * 12, RAIO_MINIMO_HALO_OLHOS),
+                           ColorAlpha(COR_BRILHO_OLHO, 0.6f * brilho * respiro), BLANK);
+    EndBlendMode();
 
     for (int lado = -1; lado <= 1; lado += 2) {
         Vector2 olho = { posicao.x + lado * tamanho * 1.6f, posicao.y };
 
         BeginBlendMode(BLEND_ADDITIVE);
-        desenharCirculoDegrade(olho, tamanho * 5, ColorAlpha(COR_BRILHO_OLHO, 0.55f * brilho), BLANK);
+        desenharCirculoDegrade(olho, tamanhoVisivel * 5, ColorAlpha(COR_BRILHO_OLHO, 0.8f * brilho), BLANK);
         EndBlendMode();
 
-        DrawEllipse((int)olho.x, (int)olho.y, tamanho, tamanho * 0.55f, ColorAlpha(COR_OLHO, brilho));
+        DrawEllipse((int)olho.x, (int)olho.y, tamanhoVisivel, tamanhoVisivel * 0.55f, ColorAlpha(COR_OLHO, brilho));
     }
 }
 
