@@ -11,6 +11,7 @@
 #define CAMINHO_SHADER_VHS      "shaders/vhs.fs"
 #define CAMINHO_FONTE           "assets/fontes/VT323-Regular.ttf"
 #define CAMINHO_CAPTURA         "assets/imagens/criatura%d.png"
+#define CAMINHO_CRIATURA_PORTA  "assets/imagens/criatura_porta.png"
 
 /* Cores dos olhos da criatura e da separação de cores do texto */
 #define COR_OLHO           GetColor(0xff3b44ff)
@@ -86,6 +87,20 @@ static void carregarQuadrosDaCaptura(Efeitos *efeitos)
     }
 }
 
+/* Carrega a criatura de corpo inteiro que aparece nas portas. Se não
+   existir, fica com id 0 e o render desenha o vulto em código.
+   Recebe os efeitos, onde a imagem é guardada. Não retorna nada. */
+static void carregarCriaturaNaPorta(Efeitos *efeitos)
+{
+    if (!FileExists(CAMINHO_CRIATURA_PORTA)) {
+        printf("REBOBINA: arquivo %s nao encontrado. A porta fica com o vulto desenhado.\n",
+               CAMINHO_CRIATURA_PORTA);
+        return;
+    }
+    efeitos->criaturaNaPorta = LoadTexture(CAMINHO_CRIATURA_PORTA);
+    SetTextureFilter(efeitos->criaturaNaPorta, TEXTURE_FILTER_BILINEAR);
+}
+
 /* Espalha os grãos de poeira pela tela, cada um com direção, tamanho e ritmo próprios.
    Recebe os efeitos, onde a poeira é guardada. Não retorna nada. */
 static void espalharPoeira(Efeitos *efeitos)
@@ -110,7 +125,7 @@ static void desenharFolha(RenderTexture2D folha)
     DrawTextureRec(folha.texture, origem, (Vector2){ 0, 0 }, WHITE);
 }
 
-/* Cria as três folhas, carrega os dois shaders, a fonte e os quadros da captura.
+/* Cria as três folhas, carrega os dois shaders, a fonte e as imagens da criatura.
    Deve ser chamada depois de InitWindow.
    Não recebe nada. Retorna os efeitos prontos para usar. */
 Efeitos carregarEfeitos(void)
@@ -145,6 +160,7 @@ Efeitos carregarEfeitos(void)
 
     carregarFonte(&efeitos);
     carregarQuadrosDaCaptura(&efeitos);
+    carregarCriaturaNaPorta(&efeitos);
     espalharPoeira(&efeitos);
 
     return efeitos;
@@ -169,6 +185,9 @@ void descarregarEfeitos(Efeitos *efeitos)
         if (efeitos->quadrosDaCaptura[quadro].id != 0) {
             UnloadTexture(efeitos->quadrosDaCaptura[quadro]);
         }
+    }
+    if (efeitos->criaturaNaPorta.id != 0) {
+        UnloadTexture(efeitos->criaturaNaPorta);
     }
 }
 

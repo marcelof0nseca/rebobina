@@ -88,9 +88,11 @@ typedef struct {
 
     /* A criatura cada vez mais perto; id 0 se a imagem não foi encontrada */
     Texture2D quadrosDaCaptura[QUADROS_DA_CAPTURA];
+    /* A mesma criatura, de corpo inteiro e fundo transparente, parada na porta */
+    Texture2D criaturaNaPorta;
 } Efeitos;
 
-/* Cria as três folhas, carrega os dois shaders, a fonte e os quadros da captura.
+/* Cria as três folhas, carrega os dois shaders, a fonte e as imagens da criatura.
    Deve ser chamada depois de InitWindow.
    Não recebe nada. Retorna os efeitos prontos para usar. */
 Efeitos carregarEfeitos(void);

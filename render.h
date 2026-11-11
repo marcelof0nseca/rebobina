@@ -69,13 +69,15 @@ typedef struct {
     float tamanho;
 } OlhosDaCriatura;
 
-/* Desenha o vulto da criatura na porta, se ela estiver numa sala vizinha:
+/* Desenha a criatura parada na porta, se ela estiver numa sala vizinha:
    na porta da direita se ela está em salaJogador->prox, na da esquerda
-   se está em salaJogador->ant. Deve ser chamada dentro da folha cena.
-   Recebe a partida, os recursos (pode ser NULL), a vista, o tempo de jogo
-   e onde guardar os olhos. Retorna true se a criatura apareceu numa porta. */
-bool desenharCriatura(const Partida *partida, const Recursos *recursos, Vista vista, float tempo,
-                      OlhosDaCriatura *olhos);
+   se está em salaJogador->ant. É a mesma imagem do susto da captura;
+   sem ela, um vulto desenhado. Deve ser chamada dentro da folha cena.
+   Recebe a partida, os recursos (pode ser NULL), os efeitos (a imagem da
+   criatura; pode ser NULL), a vista, o tempo de jogo e onde guardar os olhos.
+   Retorna true se a criatura apareceu numa porta. */
+bool desenharCriatura(const Partida *partida, const Recursos *recursos, const Efeitos *efeitos,
+                      Vista vista, float tempo, OlhosDaCriatura *olhos);
 
 /* Desenha as salas em círculo, lendo direto da lista circular: o jogador,
    a criatura e os fotogramas que ainda estão no chão. Faz parte do modo
