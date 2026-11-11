@@ -47,7 +47,7 @@ static Sound carregarSom(const char *caminho, int *tudoOk)
 
 int carregarRecursos(Recursos *recursos)
 {
-    *recursos = (Recursos){ 0 };   /* fundos[] e fonte ficam zerados por enquanto */
+    *recursos = (Recursos){ 0 };   /* a fonte fica zerada: quem carrega é o efeitos.c */
     InitAudioDevice();
 
     int tudoOk = 1;
@@ -57,6 +57,25 @@ int carregarRecursos(Recursos *recursos)
         /* imagensFotogramas[0] é o fotograma de ordem 1 */
         snprintf(caminho, sizeof(caminho), CAMINHO_IMAGENS "fotograma%d.png", i + 1);
         recursos->imagensFotogramas[i] = carregarTextura(caminho, &tudoOk);
+    }
+
+    /* fundos[tipo] é a foto da sala daquele TipoCenario. O render projeta a foto
+       nas paredes; sem ela, a sala é desenhada em código */
+    const char *nomesDosCenarios[TOTAL_CENARIOS] = {
+        [CENARIO_BILHETERIA] = "bilheteria", [CENARIO_SAGUAO] = "saguao",
+        [CENARIO_EXIBICAO] = "exibicao", [CENARIO_CORREDOR] = "corredor",
+        [CENARIO_BANHEIRO] = "banheiro", [CENARIO_CABINE] = "cabine",
+        [CENARIO_BOMBONIERE] = "bomboniere"
+    };
+    for (int i = 0; i < TOTAL_CENARIOS; i++) {
+        char caminho[64];
+        snprintf(caminho, sizeof(caminho), CAMINHO_IMAGENS "sala_%s.png", nomesDosCenarios[i]);
+        recursos->fundos[i] = carregarTextura(caminho, &tudoOk);
+        if (recursos->fundos[i].id != 0) {
+            /* Suave, e sem repetir a imagem quando a projeção passa um pouco da borda */
+            SetTextureFilter(recursos->fundos[i], TEXTURE_FILTER_BILINEAR);
+            SetTextureWrap(recursos->fundos[i], TEXTURE_WRAP_CLAMP);
+        }
     }
 
     recursos->somAmbiente = carregarMusica(CAMINHO_SONS "ambiente.ogg", &tudoOk);
