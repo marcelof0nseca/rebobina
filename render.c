@@ -28,6 +28,13 @@
    para cobrirem a tela inteira mesmo quando a vista se desloca */
 #define PROFUNDIDADE_INICIAL -0.35f
 
+/* Criatura na porta (criatura_porta.png): a silhueta preta contra um brilho
+   vermelho, em fundo preto. A imagem ocupa o vão da porta inteiro; estes são
+   os olhos na imagem (frações da largura e da altura), medidos no próprio arquivo */
+#define OLHOS_NA_IMAGEM_X 0.378f
+#define OLHOS_NA_IMAGEM_Y 0.097f
+#define DISTANCIA_DOS_OLHOS_NA_IMAGEM 0.020f    /* entre os dois olhos, em fração da altura */
+
 /* Portas da sala desenhada em código: na parede lateral, entre estas profundidades */
 #define INICIO_DA_PORTA 0.25f
 #define FIM_DA_PORTA    0.69f
@@ -642,9 +649,12 @@ static void desenharBanheiro(float tempo, Vista vista)
     terminarCamada();
 }
 
-/* Fotograma caído no chão, com brilho âmbar pulsando.
-   Recebe o tempo de jogo e a vista. Não retorna nada. */
-static void desenharFotogramaNoChao(float tempo, Vista vista)
+/* Fotograma caído no chão, com brilho âmbar pulsando. Dentro do quadro
+   aparece a imagem da cena, se carregada; sem ela, a silhueta de alguém.
+   Recebe o fotograma, os recursos (pode ser NULL), o tempo de jogo e a vista.
+   Não retorna nada. */
+static void desenharFotogramaNoChao(const Fotograma *fotograma, const Recursos *recursos,
+                                    float tempo, Vista vista)
 {
     int centroY = (int)(POS_FOTOGRAMA_Y + sinf(tempo * 2.2f) * 4);
     Color corDoFilme = GetColor(0x16110cff);
@@ -661,9 +671,20 @@ static void desenharFotogramaNoChao(float tempo, Vista vista)
         DrawRectangle(POS_FOTOGRAMA_X - 43, centroY + furo - 3, 7, 6, corDoFilme);
         DrawRectangle(POS_FOTOGRAMA_X + 36, centroY + furo - 3, 7, 6, corDoFilme);
     }
-    /* Silhueta de alguém dentro do quadro */
-    DrawEllipse(POS_FOTOGRAMA_X, centroY - 4, 8, 10, (Color){ 30, 20, 10, 180 });
-    DrawRectangle(POS_FOTOGRAMA_X - 10, centroY + 6, 20, 18, (Color){ 30, 20, 10, 180 });
+    /* A cena do fotograma: a imagem quadrada é cortada no meio, no formato do quadro */
+    int indiceDaImagem = fotograma->ordemCorreta - 1;
+    if (recursos != NULL && indiceDaImagem >= 0 && indiceDaImagem < TOTAL_FOTOGRAMAS
+        && recursos->imagensFotogramas[indiceDaImagem].id != 0) {
+        Texture2D imagem = recursos->imagensFotogramas[indiceDaImagem];
+        float alturaDoCorte = imagem.width * 48.0f / 64.0f;
+        Rectangle origem = { 0, (imagem.height - alturaDoCorte) / 2, (float)imagem.width, alturaDoCorte };
+        Rectangle destino = { POS_FOTOGRAMA_X - 32, (float)centroY - 24, 64, 48 };
+        DrawTexturePro(imagem, origem, destino, (Vector2){ 0, 0 }, 0, GetColor(0xffe2b8ff));   /* tom âmbar */
+    } else {
+        /* Silhueta de alguém dentro do quadro */
+        DrawEllipse(POS_FOTOGRAMA_X, centroY - 4, 8, 10, (Color){ 30, 20, 10, 180 });
+        DrawRectangle(POS_FOTOGRAMA_X - 10, centroY + 6, 20, 18, (Color){ 30, 20, 10, 180 });
+    }
     terminarCamada();
 }
 
@@ -992,17 +1013,19 @@ void desenharSala(const Partida *partida, const Recursos *recursos, Vista vista,
     desenharNevoa(tempo, vista);
 
     if (sala->fotogramaNoChao != NULL) {
-        desenharFotogramaNoChao(tempo, vista);
+        desenharFotogramaNoChao(sala->fotogramaNoChao, recursos, tempo, vista);
     }
 }
 
-/* Desenha o vulto da criatura na porta, se ela estiver numa sala vizinha:
+/* Desenha a criatura parada na porta, se ela estiver numa sala vizinha:
    na porta da direita se ela está em salaJogador->prox, na da esquerda
-   se está em salaJogador->ant. Deve ser chamada dentro da folha cena.
-   Recebe a partida, os recursos (pode ser NULL), a vista, o tempo de jogo
-   e onde guardar os olhos. Retorna true se a criatura apareceu numa porta. */
-bool desenharCriatura(const Partida *partida, const Recursos *recursos, Vista vista, float tempo,
-                      OlhosDaCriatura *olhos)
+   se está em salaJogador->ant. É a mesma imagem do susto da captura;
+   sem ela, um vulto desenhado. Deve ser chamada dentro da folha cena.
+   Recebe a partida, os recursos (pode ser NULL), os efeitos (a imagem da
+   criatura; pode ser NULL), a vista, o tempo de jogo e onde guardar os olhos.
+   Retorna true se a criatura apareceu numa porta. */
+bool desenharCriatura(const Partida *partida, const Recursos *recursos, const Efeitos *efeitos,
+                      Vista vista, float tempo, OlhosDaCriatura *olhos)
 {
     const Sala *sala = partida->salaJogador;
     if (sala == NULL || partida->salaCriatura == NULL) {
@@ -1025,7 +1048,45 @@ bool desenharCriatura(const Partida *partida, const Recursos *recursos, Vista vi
     Vector2 cantos[4];
     pontosDaPorta(vista, lado, cantos);
 
-    /* Uma luz vermelha fraca vem de dentro da porta */
+    /* A imagem é encaixada no vão da porta e somada como luz: o preto do fundo
+       não muda nada, o brilho vermelho acende o fundo da porta e o corpo,
+       escuro, fica recortado contra ele. A textura da porta da foto continua lá */
+    if (efeitos != NULL && efeitos->criaturaNaPorta.id != 0) {
+        /* Na porta da esquerda a borda de fora fica à esquerda na tela; na da direita, à direita */
+        Vector2 topoEsquerdo = (lado < 0) ? cantos[0] : cantos[1];
+        Vector2 topoDireito = (lado < 0) ? cantos[1] : cantos[0];
+        Vector2 baseDireita = (lado < 0) ? cantos[2] : cantos[3];
+        Vector2 baseEsquerda = (lado < 0) ? cantos[3] : cantos[2];
+
+        BeginBlendMode(BLEND_ADDITIVE);
+        rlDisableBackfaceCulling();
+        rlSetTexture(efeitos->criaturaNaPorta.id);
+        rlBegin(RL_QUADS);
+        rlColor4ub(255, 255, 255, 255);
+        rlTexCoord2f(0, 0);
+        rlVertex2f(topoEsquerdo.x, topoEsquerdo.y);
+        rlTexCoord2f(0, 1);
+        rlVertex2f(baseEsquerda.x, baseEsquerda.y);
+        rlTexCoord2f(1, 1);
+        rlVertex2f(baseDireita.x, baseDireita.y);
+        rlTexCoord2f(1, 0);
+        rlVertex2f(topoDireito.x, topoDireito.y);
+        rlEnd();
+        rlSetTexture(0);
+        rlEnableBackfaceCulling();
+        EndBlendMode();
+
+        /* Os olhos que brilham depois da lanterna ficam em cima dos olhos da imagem.
+           O desenharOlhosCriatura afasta cada olho 1,6 tamanho do centro */
+        Vector2 alturaDosOlhosEsquerda = misturarPontos(topoEsquerdo, baseEsquerda, OLHOS_NA_IMAGEM_Y);
+        Vector2 alturaDosOlhosDireita = misturarPontos(topoDireito, baseDireita, OLHOS_NA_IMAGEM_Y);
+        olhos->posicao = misturarPontos(alturaDosOlhosEsquerda, alturaDosOlhosDireita, OLHOS_NA_IMAGEM_X);
+        float alturaDaPorta = ((baseEsquerda.y - topoEsquerdo.y) + (baseDireita.y - topoDireito.y)) / 2;
+        olhos->tamanho = alturaDaPorta * DISTANCIA_DOS_OLHOS_NA_IMAGEM / 3.2f;
+        return true;
+    }
+
+    /* Sem a imagem: uma luz vermelha fraca vem de dentro da porta... */
     desenharQuadrilatero(cantos[0], cantos[3], cantos[2], cantos[1], GetColor(0x3c0408ff));
 
     float centroX = (cantos[0].x + cantos[1].x) / 2 + sinf(tempo * 1.3f) * 3;
@@ -1033,7 +1094,7 @@ bool desenharCriatura(const Partida *partida, const Recursos *recursos, Vista vi
     float base = (cantos[2].y + cantos[3].y) / 2;
     float altura = base - topo;
 
-    /* Corpo: cabeça alongada, ombros caídos e tronco até o chão */
+    /* ...e um vulto: cabeça alongada, ombros caídos e tronco até o chão */
     DrawEllipse((int)centroX, (int)(topo + altura * 0.20f), altura * 0.09f, altura * 0.12f, BLACK);
     DrawEllipse((int)centroX, (int)(topo + altura * 0.45f), altura * 0.15f, altura * 0.12f, BLACK);
     DrawRectangle((int)(centroX - altura * 0.15f), (int)(topo + altura * 0.45f),

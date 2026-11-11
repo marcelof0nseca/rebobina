@@ -310,7 +310,7 @@ static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efei
     ClearBackground(COR_FUNDO);
     if (estaEmPartida(partida->estadoAtual)) {
         desenharSala(partida, recursos, vista, tempo);
-        criaturaNaPorta = desenharCriatura(partida, recursos, vista, tempo, &olhos);
+        criaturaNaPorta = desenharCriatura(partida, recursos, efeitos, vista, tempo, &olhos);
     }
     EndTextureMode();
 
