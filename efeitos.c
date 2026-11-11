@@ -10,6 +10,7 @@
 #define CAMINHO_SHADER_LANTERNA "shaders/lanterna.fs"
 #define CAMINHO_SHADER_VHS      "shaders/vhs.fs"
 #define CAMINHO_FONTE           "assets/fontes/VT323-Regular.ttf"
+#define CAMINHO_CAPTURA         "assets/imagens/criatura%d.png"
 
 /* Cores dos olhos da criatura e da separação de cores do texto */
 #define COR_OLHO           GetColor(0xff3b44ff)
@@ -23,6 +24,18 @@
 #define PRIMEIRO_CODIGO_FONTE 32
 #define QUANTIDADE_CODIGOS_FONTE 224
 #define TAMANHO_FONTE 64
+
+/* Cena da captura, quadro a quadro. Cada quadro começa em INICIO_DOS_QUADROS[i]
+   e acaba quando o próximo começa; depois do último, a tela fica preta.
+   O zoom cresce a partir dos olhos (em pixels da imagem de 960 x 540),
+   para o olhar da criatura ficar parado enquanto ela se aproxima */
+static const float INICIO_DOS_QUADROS[QUADROS_DA_CAPTURA + 1] = {
+    INICIO_DA_CRIATURA_NA_CAPTURA, 0.60f, 0.90f, 1.40f
+};
+static const Vector2 OLHOS_NA_CAPTURA[QUADROS_DA_CAPTURA] = { { 467, 137 }, { 430, 150 }, { 428, 69 } };
+static const float ZOOM_NO_COMECO[QUADROS_DA_CAPTURA] = { 1.00f, 1.00f, 1.05f };
+static const float ZOOM_NO_FIM[QUADROS_DA_CAPTURA] = { 1.08f, 1.30f, 1.45f };
+static const float TREMOR_DA_CAPTURA[QUADROS_DA_CAPTURA] = { 2.0f, 7.0f, 16.0f };   /* em pixels */
 
 /* Carrega um shader de fragmento e avisa no terminal se o arquivo não existir.
    Recebe o caminho do arquivo.
@@ -53,6 +66,24 @@ static void carregarFonte(Efeitos *efeitos)
     efeitos->fonteVeioDoArquivo = true;
 }
 
+/* Carrega as imagens da cena da captura. A que não existir fica com id 0
+   e a cena se vira sem ela.
+   Recebe os efeitos, onde as imagens são guardadas. Não retorna nada. */
+static void carregarQuadrosDaCaptura(Efeitos *efeitos)
+{
+    for (int quadro = 0; quadro < QUADROS_DA_CAPTURA; quadro++) {
+        char caminho[64];
+        snprintf(caminho, sizeof caminho, CAMINHO_CAPTURA, quadro + 1);
+        if (!FileExists(caminho)) {
+            printf("REBOBINA: arquivo %s nao encontrado. A captura fica sem a imagem.\n", caminho);
+            continue;
+        }
+        efeitos->quadrosDaCaptura[quadro] = LoadTexture(caminho);
+        /* Filtro suave: com o zoom, a imagem não fica quadriculada */
+        SetTextureFilter(efeitos->quadrosDaCaptura[quadro], TEXTURE_FILTER_BILINEAR);
+    }
+}
+
 /* Espalha os grãos de poeira pela tela, cada um com direção, tamanho e ritmo próprios.
    Recebe os efeitos, onde a poeira é guardada. Não retorna nada. */
 static void espalharPoeira(Efeitos *efeitos)
@@ -77,7 +108,7 @@ static void desenharFolha(RenderTexture2D folha)
     DrawTextureRec(folha.texture, origem, (Vector2){ 0, 0 }, WHITE);
 }
 
-/* Cria as três folhas, carrega os dois shaders e a fonte.
+/* Cria as três folhas, carrega os dois shaders, a fonte e os quadros da captura.
    Deve ser chamada depois de InitWindow.
    Não recebe nada. Retorna os efeitos prontos para usar. */
 Efeitos carregarEfeitos(void)
@@ -111,6 +142,7 @@ Efeitos carregarEfeitos(void)
                    &resolucao, SHADER_UNIFORM_VEC2);
 
     carregarFonte(&efeitos);
+    carregarQuadrosDaCaptura(&efeitos);
     espalharPoeira(&efeitos);
 
     return efeitos;
@@ -129,6 +161,12 @@ void descarregarEfeitos(Efeitos *efeitos)
     /* A fonte padrão pertence ao raylib e não pode ser liberada aqui */
     if (efeitos->fonteVeioDoArquivo) {
         UnloadFont(efeitos->fonte);
+    }
+
+    for (int quadro = 0; quadro < QUADROS_DA_CAPTURA; quadro++) {
+        if (efeitos->quadrosDaCaptura[quadro].id != 0) {
+            UnloadTexture(efeitos->quadrosDaCaptura[quadro]);
+        }
     }
 }
 
@@ -448,6 +486,76 @@ void desenharOlhosCriatura(Vector2 posicao, float tamanho, float tempo,
         EndBlendMode();
 
         DrawEllipse((int)olho.x, (int)olho.y, tamanho, tamanho * 0.55f, ColorAlpha(COR_OLHO, brilho));
+    }
+}
+
+/* Desenha a cena da captura, no lugar da sala: a criatura parada piscando
+   no escuro, depois no meio do pulo e por fim com o rosto na câmera,
+   com zoom a partir dos olhos, tremor e um clarão vermelho. No fim, tela preta.
+   Sem as imagens, mostra só os olhos crescendo no escuro.
+   Deve ser chamada dentro de BeginTextureMode(efeitos->quadro).
+   Recebe os efeitos e os segundos desde a captura. Não retorna nada. */
+void desenharCaptura(const Efeitos *efeitos, float segundosDesdeCaptura)
+{
+    /* Qual quadro está na tela agora; antes do primeiro e depois do último, nada */
+    int quadro = -1;
+    for (int indice = 0; indice < QUADROS_DA_CAPTURA; indice++) {
+        if (segundosDesdeCaptura >= INICIO_DOS_QUADROS[indice]
+            && segundosDesdeCaptura < INICIO_DOS_QUADROS[indice + 1]) {
+            quadro = indice;
+        }
+    }
+    if (quadro == -1) {
+        return;
+    }
+
+    /* O primeiro quadro pisca, como a fita perdendo o sinal */
+    if (quadro == 0 && sinf(segundosDesdeCaptura * 60.0f) < -0.3f) {
+        return;
+    }
+
+    float duracao = INICIO_DOS_QUADROS[quadro + 1] - INICIO_DOS_QUADROS[quadro];
+    float progresso = (segundosDesdeCaptura - INICIO_DOS_QUADROS[quadro]) / duracao;
+
+    /* O zoom acelera, começando devagar e terminando rápido, como um bote */
+    float zoom = ZOOM_NO_COMECO[quadro] + (ZOOM_NO_FIM[quadro] - ZOOM_NO_COMECO[quadro]) * progresso * progresso;
+    float forcaDoTremor = TREMOR_DA_CAPTURA[quadro];
+    Vector2 tremor = { sinf(segundosDesdeCaptura * 91.0f) * forcaDoTremor,
+                       cosf(segundosDesdeCaptura * 77.0f) * forcaDoTremor };
+    Vector2 olhos = OLHOS_NA_CAPTURA[quadro];
+
+    Texture2D imagem = efeitos->quadrosDaCaptura[quadro];
+    if (imagem.id != 0) {
+        /* Os olhos ficam no mesmo ponto da tela enquanto o resto cresce em volta.
+           A sobra de forcaDoTremor em cada lado esconde as bordas quando a imagem treme */
+        Rectangle destino = {
+            olhos.x - olhos.x * zoom + tremor.x - forcaDoTremor,
+            olhos.y - olhos.y * zoom + tremor.y - forcaDoTremor,
+            LARGURA_VIRTUAL * zoom + forcaDoTremor * 2,
+            ALTURA_VIRTUAL * zoom + forcaDoTremor * 2
+        };
+        DrawTexturePro(imagem, (Rectangle){ 0, 0, (float)imagem.width, (float)imagem.height },
+                       destino, (Vector2){ 0, 0 }, 0, WHITE);
+
+        /* De longe ela some no escuro: os olhos acendem por cima, como os da porta */
+        if (quadro == 0) {
+            Vector2 olhosNaTela = { olhos.x + tremor.x, olhos.y + tremor.y };
+            desenharOlhosCriatura(olhosNaTela, 3.5f * zoom, segundosDesdeCaptura, olhosNaTela, LARGURA_VIRTUAL);
+        }
+    } else {
+        /* Sem a imagem: só os olhos, cada quadro maiores. A "lanterna" fica
+           em cima deles, para brilharem com toda a força */
+        Vector2 posicao = { olhos.x + tremor.x, olhos.y + tremor.y };
+        float tamanho = 3.0f * (quadro + 1) * (quadro + 1) * zoom;
+        desenharOlhosCriatura(posicao, tamanho, segundosDesdeCaptura, posicao, LARGURA_VIRTUAL);
+    }
+
+    /* No último quadro, um clarão vermelho no instante do bote */
+    if (quadro == QUADROS_DA_CAPTURA - 1) {
+        float clarao = 1.0f - progresso * 4.0f;
+        if (clarao > 0) {
+            DrawRectangle(0, 0, LARGURA_VIRTUAL, ALTURA_VIRTUAL, ColorAlpha(COR_BRILHO_OLHO, 0.55f * clarao));
+        }
     }
 }
 
