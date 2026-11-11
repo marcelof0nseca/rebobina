@@ -42,10 +42,11 @@ static void desenharRodape(const char *instrucao, int centroX)
 
 EstadoJogo desenharMenu(int *opcaoSelecionada)
 {
-    int centroX = LARGURA_VIRTUAL / 2;
+    /* O nome do jogo está na marquise da fachada, desenhada atrás do menu
+       (efeitos.c); as opções ficam na rua escura, à esquerda do cinema */
+    int centroX = 150;
 
-    desenharTextoCentralizado("REBOBINA", centroX, 90, 64, COR_SANGUE);
-    desenharTextoCentralizado("um cinema de rua não esquece", centroX, 165, 18, COR_CREME);
+    desenharTextoCentralizado("um cinema de rua não esquece", centroX, ALTURA_VIRTUAL - 60, 16, COR_CREME);
 
     if (IsKeyPressed(KEY_DOWN)) {
         *opcaoSelecionada = (*opcaoSelecionada + 1) % TOTAL_OPCOES_MENU;
@@ -53,8 +54,8 @@ EstadoJogo desenharMenu(int *opcaoSelecionada)
         *opcaoSelecionada = (*opcaoSelecionada + TOTAL_OPCOES_MENU - 1) % TOTAL_OPCOES_MENU;
     }
 
-    int primeiraLinha = 280;
-    int espacamento = 48;
+    int primeiraLinha = 290;
+    int espacamento = 44;
     for (int i = 0; i < TOTAL_OPCOES_MENU; i++) {
         char linha[32];
         if (i == *opcaoSelecionada) {

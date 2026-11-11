@@ -6,12 +6,14 @@
 #include <stdio.h>
 #include <math.h>
 #include "efeitos.h"
+#include "rlgl.h"     /* rlPushMatrix: a fachada e o brilho da marquise se movem juntos */
 
 #define CAMINHO_SHADER_LANTERNA "shaders/lanterna.fs"
 #define CAMINHO_SHADER_VHS      "shaders/vhs.fs"
 #define CAMINHO_FONTE           "assets/fontes/VT323-Regular.ttf"
 #define CAMINHO_CAPTURA         "assets/imagens/criatura%d.png"
 #define CAMINHO_CRIATURA_PORTA  "assets/imagens/criatura_porta.png"
+#define CAMINHO_FACHADA         "assets/imagens/menu_fachada.png"
 
 /* Cores dos olhos da criatura e da separação de cores do texto */
 #define COR_OLHO           GetColor(0xff3b44ff)
@@ -22,6 +24,21 @@
    em pixels, para continuarem visíveis no escuro mesmo de longe */
 #define TAMANHO_MINIMO_OLHO     3.2f
 #define RAIO_MINIMO_HALO_OLHOS  30.0f
+
+/* Fachada do menu, em pixels da imagem de 960 x 540: a luz no fundo da porta
+   (para onde a câmera avança na entrada) e o meio da marquise, onde está o nome.
+   A imagem aparece um pouco ampliada, para sobrar borda quando a câmera balança */
+#define PORTA_DA_FACHADA_X 612.0f
+#define PORTA_DA_FACHADA_Y 360.0f
+#define MARQUISE_X 580.0f
+#define MARQUISE_Y 168.0f
+#define AMPLIACAO_DA_FACHADA 1.05f
+#define AMPLIACAO_NO_FIM_DA_ENTRADA 6.0f
+/* O I quase apagado do nome na marquise: centro, topo e base, e a cor das outras letras */
+#define LETRA_I_X 631
+#define LETRA_I_TOPO 151
+#define LETRA_I_BASE 199
+#define COR_LETRA_DA_MARQUISE (Color){ 108, 24, 22, 255 }
 
 /* Intensidade da lanterna no meio de uma piscada */
 #define INTENSIDADE_PISCANDO 0.3f
@@ -130,7 +147,21 @@ static void desenharFolha(RenderTexture2D folha)
     DrawTextureRec(folha.texture, origem, (Vector2){ 0, 0 }, WHITE);
 }
 
-/* Cria as três folhas, carrega os dois shaders, a fonte e as imagens da criatura.
+/* Carrega a fachada do cinema que fica atrás do menu. Se não existir,
+   fica com id 0 e o menu fica com o fundo preto.
+   Recebe os efeitos, onde a imagem é guardada. Não retorna nada. */
+static void carregarFachada(Efeitos *efeitos)
+{
+    if (!FileExists(CAMINHO_FACHADA)) {
+        printf("REBOBINA: arquivo %s nao encontrado. O menu fica com o fundo preto.\n", CAMINHO_FACHADA);
+        return;
+    }
+    efeitos->fachadaDoMenu = LoadTexture(CAMINHO_FACHADA);
+    /* Filtro suave: na entrada a imagem é ampliada várias vezes */
+    SetTextureFilter(efeitos->fachadaDoMenu, TEXTURE_FILTER_BILINEAR);
+}
+
+/* Cria as três folhas, carrega os dois shaders, a fonte, as imagens da criatura e a fachada.
    Deve ser chamada depois de InitWindow.
    Não recebe nada. Retorna os efeitos prontos para usar. */
 Efeitos carregarEfeitos(void)
@@ -166,6 +197,7 @@ Efeitos carregarEfeitos(void)
     carregarFonte(&efeitos);
     carregarQuadrosDaCaptura(&efeitos);
     carregarCriaturaNaPorta(&efeitos);
+    carregarFachada(&efeitos);
     espalharPoeira(&efeitos);
 
     return efeitos;
@@ -193,6 +225,9 @@ void descarregarEfeitos(Efeitos *efeitos)
     }
     if (efeitos->criaturaNaPorta.id != 0) {
         UnloadTexture(efeitos->criaturaNaPorta);
+    }
+    if (efeitos->fachadaDoMenu.id != 0) {
+        UnloadTexture(efeitos->fachadaDoMenu);
     }
 }
 
@@ -615,4 +650,73 @@ void desenharTextoVHS(Font fonte, const char *texto, Vector2 posicao, float tama
     DrawTextEx(fonte, texto, (Vector2){ posicao.x - 1.5f, posicao.y }, tamanho, espacamento,
                COR_SEPARACAO_AZUL);
     DrawTextEx(fonte, texto, posicao, tamanho, espacamento, cor);
+}
+
+/* Desenha a fachada do cinema atrás do menu, com a câmera balançando de leve
+   e as lâmpadas da marquise oscilando. Durante a entrada, a câmera avança
+   pela porta aberta, acelerando, até a tela ficar preta.
+   Sem a imagem, não desenha nada (fica o fundo preto).
+   Deve ser chamada dentro de BeginTextureMode(efeitos->quadro).
+   Recebe os efeitos, o tempo de jogo e os segundos desde que a entrada
+   começou (negativo = parado no menu). Não retorna nada. */
+void desenharFachada(const Efeitos *efeitos, float tempo, float segundosDaEntrada)
+{
+    Texture2D fachada = efeitos->fachadaDoMenu;
+    if (fachada.id == 0) {
+        return;
+    }
+
+    /* Quanto da entrada já passou: 0 = parado no menu, 1 = chegou na porta */
+    float avanco = 0;
+    if (segundosDaEntrada > 0) {
+        avanco = fminf(segundosDaEntrada / DURACAO_ENTRADA, 1.0f);
+    }
+
+    /* O zoom cresce em ritmo de passo (exponencial) e acelera com o avanço ao quadrado */
+    float zoom = AMPLIACAO_DA_FACHADA * powf(AMPLIACAO_NO_FIM_DA_ENTRADA / AMPLIACAO_DA_FACHADA,
+                                             avanco * avanco);
+    /* Balanço de quem segura a filmadora; na entrada, o passo sacode um pouco mais */
+    float sacudida = 1.0f + avanco * 2.0f;
+    Vector2 balanco = { (sinf(tempo * 0.6f) * 3.0f + sinf(tempo * 1.7f)) * sacudida,
+                        cosf(tempo * 0.8f) * 2.5f * sacudida + sinf(tempo * 9.0f) * 2.0f * avanco };
+
+    /* Tudo cresce em volta da porta: ela fica parada enquanto o resto passa pelas bordas */
+    rlPushMatrix();
+    rlTranslatef(PORTA_DA_FACHADA_X + balanco.x, PORTA_DA_FACHADA_Y + balanco.y, 0);
+    rlScalef(zoom, zoom, 1);
+    rlTranslatef(-PORTA_DA_FACHADA_X, -PORTA_DA_FACHADA_Y, 0);
+
+    DrawTexturePro(fachada, (Rectangle){ 0, 0, (float)fachada.width, (float)fachada.height },
+                   (Rectangle){ 0, 0, LARGURA_VIRTUAL, ALTURA_VIRTUAL }, (Vector2){ 0, 0 }, 0, WHITE);
+
+    /* O I de REBOBINA está quase apagado na imagem: aqui ele acende por cima,
+       como uma lâmpada com defeito que de vez em quando falha */
+    bool iFalhando = fmodf(tempo, 3.7f) < 0.35f || fmodf(tempo, 1.3f) < 0.06f;
+    if (!iFalhando) {
+        Color corDoI = ColorAlpha(COR_LETRA_DA_MARQUISE, 0.85f + 0.15f * sinf(tempo * 31.0f));
+        DrawRectangle(LETRA_I_X - 6, LETRA_I_TOPO, 12, LETRA_I_BASE - LETRA_I_TOPO, corDoI);  /* haste */
+        DrawRectangle(LETRA_I_X - 14, LETRA_I_TOPO, 28, 6, corDoI);                          /* serifa de cima */
+        DrawRectangle(LETRA_I_X - 14, LETRA_I_BASE - 6, 28, 6, corDoI);                      /* serifa de baixo */
+    }
+
+    /* Lâmpadas velhas da marquise: um brilho vermelho fraco que oscila e às vezes cai */
+    float oscilacao = 0.75f + 0.25f * sinf(tempo * 13.0f) * sinf(tempo * 3.7f);
+    if (fmodf(tempo, 5.3f) < 0.15f) {
+        oscilacao = 0.3f;
+    }
+    rlPushMatrix();
+    rlTranslatef(MARQUISE_X, MARQUISE_Y, 0);
+    rlScalef(1.0f, 0.22f, 1.0f);
+    BeginBlendMode(BLEND_ADDITIVE);
+    desenharCirculoDegrade((Vector2){ 0, 0 }, 330, ColorAlpha(COR_BRILHO_OLHO, 0.22f * oscilacao), BLANK);
+    EndBlendMode();
+    rlPopMatrix();
+
+    rlPopMatrix();
+
+    /* No fim da entrada, a escuridão do saguão toma a tela */
+    if (avanco > 0.55f) {
+        float escuro = fminf((avanco - 0.55f) / 0.4f, 1.0f);
+        DrawRectangle(0, 0, LARGURA_VIRTUAL, ALTURA_VIRTUAL, ColorAlpha(BLACK, escuro));
+    }
 }
