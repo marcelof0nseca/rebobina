@@ -55,7 +55,7 @@ EstadoJogo desenharMenu(int *opcaoSelecionada)
        (efeitos.c); as opções ficam na rua escura, à esquerda do cinema */
     int centroX = 150;
 
-    desenharTextoCentralizado("um cinema de rua não esquece", centroX, ALTURA_VIRTUAL - 60, 16, COR_CREME);
+    desenharTextoCentralizado("a última sessão nunca terminou", centroX, ALTURA_VIRTUAL - 60, 16, COR_CREME);
 
     if (IsKeyPressed(KEY_DOWN)) {
         *opcaoSelecionada = (*opcaoSelecionada + 1) % TOTAL_OPCOES_MENU;
