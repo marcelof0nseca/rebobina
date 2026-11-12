@@ -127,7 +127,7 @@ gcc -Wall -Wextra -std=c99 teste_fotogramas.c fotogramas.c -o teste_fotogramas &
 
 Os dois primeiros conferem 1603 casos cada um, comparando a versão completa com a versão passo a passo do algoritmo; o terceiro confere a distribuição e a coleta dos fotogramas.
 
-A memória é conferida com valgrind (`valgrind --leak-check=full ./rebobina`, jogando e saindo pelo menu). Nos testes de carregar, desenhar e liberar todos os recursos, o código do jogo não deixa vazamentos; o único bloco que aparece (112 bytes) vem do driver de vídeo Mesa ao usar shaders, e se repete num programa raylib de 10 linhas.
+A memória foi conferida com valgrind (`--leak-check=full`) numa partida simulada inteira, com o código real do jogo: entrada no cinema, exploração, captura, volta ao menu, nova partida e montagem até a vitória, liberando tudo no fim. Não há leituras ou escritas inválidas nem vazamentos do código do jogo; o único bloco que aparece (112 bytes) vem do driver de vídeo Mesa ao usar shaders, e se repete num programa raylib de 10 linhas.
 
 ## Estrutura do projeto
 
