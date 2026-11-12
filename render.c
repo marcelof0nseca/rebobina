@@ -69,7 +69,7 @@
 
 /* Modo apresentação (F1) na montagem: o painel e o minimapa ficam embaixo
    da tira, abaixo de onde o quadro que troca chega no arco */
-#define TOPO_DA_APRESENTACAO_NA_MONTAGEM 334.0f
+#define TOPO_DA_APRESENTACAO_NA_MONTAGEM 328.0f
 
 #define FILEIRAS_DE_POLTRONAS 4
 #define CARTAZES_DO_CORREDOR 3
@@ -1142,7 +1142,7 @@ void desenharMinimapa(const Partida *partida, const Efeitos *efeitos)
     float altura = 34 + raio * 2 + (montagem ? 16 : 40);
 
     DrawRectangle((int)(centro.x - meiaLargura), (int)topo, (int)(meiaLargura * 2), (int)altura, (Color){ 0, 0, 0, 190 });
-    desenharTextoVHS(efeitos->fonte, "LISTA CIRCULAR", (Vector2){ centro.x, topo + 6 }, 14, COR_AMBAR, ALINHAR_CENTRO);
+    desenharTextoVHS(efeitos->fonte, "LISTA CIRCULAR", (Vector2){ centro.x, topo + 6 }, 18, COR_AMBAR, ALINHAR_CENTRO);
 
     /* Cada sala vira um ponto no círculo, na ordem em que aparece na lista */
     float raioDoPonto = montagem ? 6.0f : 9.0f;
@@ -1177,11 +1177,11 @@ void desenharMinimapa(const Partida *partida, const Efeitos *efeitos)
     float x = centro.x - 96;
     float y = centro.y + raio + 18;
     DrawCircleV((Vector2){ x + 5, y + 7 }, 5, COR_CREME);
-    desenharTextoVHS(efeitos->fonte, "você", (Vector2){ x + 13, y }, 12, COR_CREME, ALINHAR_ESQUERDA);
+    desenharTextoVHS(efeitos->fonte, "você", (Vector2){ x + 13, y }, 15, COR_CREME, ALINHAR_ESQUERDA);
     DrawRing((Vector2){ x + 55, y + 7 }, 4, 6, 0, 360, 16, COR_SANGUE);
-    desenharTextoVHS(efeitos->fonte, "criatura", (Vector2){ x + 63, y }, 12, COR_CREME, ALINHAR_ESQUERDA);
+    desenharTextoVHS(efeitos->fonte, "criatura", (Vector2){ x + 63, y }, 15, COR_CREME, ALINHAR_ESQUERDA);
     DrawCircleV((Vector2){ x + 125, y + 7 }, 4, COR_AMBAR);
-    desenharTextoVHS(efeitos->fonte, "fotograma", (Vector2){ x + 131, y }, 12, COR_CREME, ALINHAR_ESQUERDA);
+    desenharTextoVHS(efeitos->fonte, "fotograma", (Vector2){ x + 131, y }, 15, COR_CREME, ALINHAR_ESQUERDA);
 }
 
 /* Desenha o painel do modo apresentação (F1): o tamanho da lista circular,
@@ -1201,34 +1201,35 @@ void desenharPainelApresentacao(const Partida *partida, const Efeitos *efeitos)
        da exploração e a da direita mostra a ordenação */
     float esquerda = 34;
     float topo = 150;
-    float espaco = 20;
-    float tamanhoDoTitulo = 16;
-    float largura = 300;
-    float altura = 124;
+    float espaco = 24;
+    float tamanhoDoTexto = 18;     /* a VT323 desenha as letras menores: abaixo disso não se lê */
+    float avancoDoTitulo = 28;
+    float largura = 350;
+    float altura = 140;
     if (montagem) {
         topo = TOPO_DA_APRESENTACAO_NA_MONTAGEM + 8;
-        espaco = 16;
-        tamanhoDoTitulo = 14;
-        largura = ordenando ? 400 : 210;
-        altura = 78;
+        espaco = 18;
+        avancoDoTitulo = 22;
+        largura = ordenando ? 450 : 240;
+        altura = 90;
     }
 
     DrawRectangle((int)esquerda - 10, (int)topo - 8, (int)largura, (int)altura, (Color){ 0, 0, 0, 190 });
     desenharTextoVHS(fonte, "MODO APRESENTAÇÃO (F1)", (Vector2){ esquerda, topo },
-                     tamanhoDoTitulo, COR_AMBAR, ALINHAR_ESQUERDA);
-    float linha = topo + (montagem ? 20 : 26);
+                     20, COR_AMBAR, ALINHAR_ESQUERDA);
+    float linha = topo + avancoDoTitulo;
 
     if (!montagem) {
         desenharTextoVHS(fonte, TextFormat("Salas na lista circular: %d", contarSalas(partida->primeiraSala)),
-                         (Vector2){ esquerda, linha }, 14, COR_CREME, ALINHAR_ESQUERDA);
+                         (Vector2){ esquerda, linha }, tamanhoDoTexto, COR_CREME, ALINHAR_ESQUERDA);
         linha += espaco;
     }
     desenharTextoVHS(fonte, TextFormat("distanciaCircular: %d", distanciaCircular(partida->salaJogador, partida->salaCriatura)),
-                     (Vector2){ esquerda, linha }, 14, COR_CREME, ALINHAR_ESQUERDA);
+                     (Vector2){ esquerda, linha }, tamanhoDoTexto, COR_CREME, ALINHAR_ESQUERDA);
     linha += espaco;
     int limite = montagem ? LIMITE_RUIDO_MONTAGEM : LIMITE_RUIDO_EXPLORACAO;
     desenharTextoVHS(fonte, TextFormat("Ruído: %d de %d", partida->ruidoAcumulado, limite),
-                     (Vector2){ esquerda, linha }, 14, COR_CREME, ALINHAR_ESQUERDA);
+                     (Vector2){ esquerda, linha }, tamanhoDoTexto, COR_CREME, ALINHAR_ESQUERDA);
     linha += espaco;
 
     /* A lista simplesmente encadeada dos coletados, na ordem dos nós.
@@ -1241,24 +1242,24 @@ void desenharPainelApresentacao(const Partida *partida, const Efeitos *efeitos)
         usado += snprintf(coletados + usado, sizeof coletados - usado, "%s%d",
                           (atual == partida->fotogramasColetados) ? " " : ligacao, atual->ordemCorreta);
     }
-    desenharTextoVHS(fonte, coletados, (Vector2){ esquerda, linha }, 14, COR_CREME, ALINHAR_ESQUERDA);
+    desenharTextoVHS(fonte, coletados, (Vector2){ esquerda, linha }, tamanhoDoTexto, COR_CREME, ALINHAR_ESQUERDA);
 
     if (!ordenando) {
         return;
     }
 
     /* Coluna da direita: o que a ordenação está fazendo, com os nomes técnicos */
-    float x = esquerda + 170;
-    linha = topo + 20;
+    float x = esquerda + 190;
+    linha = topo + avancoDoTitulo;
     const char *nome = (ordenacao->algoritmo == ALGORITMO_BUBBLE) ? "Bubble Sort" : "Insertion Sort";
-    desenharTextoVHS(fonte, TextFormat("Algoritmo: %s", nome), (Vector2){ x, linha }, 14, COR_AMBAR, ALINHAR_ESQUERDA);
+    desenharTextoVHS(fonte, TextFormat("Algoritmo: %s", nome), (Vector2){ x, linha }, tamanhoDoTexto, COR_AMBAR, ALINHAR_ESQUERDA);
     linha += espaco;
     desenharTextoVHS(fonte, TextFormat("Comparando posições %d e %d", ordenacao->posicaoComparada,
                                        ordenacao->posicaoComparada + 1),
-                     (Vector2){ x, linha }, 14, COR_CREME, ALINHAR_ESQUERDA);
+                     (Vector2){ x, linha }, tamanhoDoTexto, COR_CREME, ALINHAR_ESQUERDA);
     linha += espaco;
     desenharTextoVHS(fonte, TextFormat("Comparações: %d  Trocas: %d", ordenacao->comparacoes, ordenacao->trocas),
-                     (Vector2){ x, linha }, 14, COR_CREME, ALINHAR_ESQUERDA);
+                     (Vector2){ x, linha }, tamanhoDoTexto, COR_CREME, ALINHAR_ESQUERDA);
 }
 
 /* Escreve as instruções da Cabine de Projeção: quantos fotogramas faltam,

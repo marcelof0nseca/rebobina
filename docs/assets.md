@@ -47,7 +47,7 @@ Os outros foram sintetizados pela própria equipe, com um programa em Python que
 - Origem: [Google Fonts](https://fonts.google.com/specimen/VT323).
 - Licença: SIL Open Font License 1.1 (OFL).
 
-A fonte foi utilizada como referência tipográfica para a identidade visual do jogo.
+É a fonte do HUD e dos textos do jogo. O arquivo está em `assets/fontes/VT323-Regular.ttf`, junto com a licença (`assets/fontes/OFL.txt`), como a OFL pede.
 
 ## 4. Observações
 
