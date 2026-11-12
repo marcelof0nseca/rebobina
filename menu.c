@@ -87,31 +87,50 @@ EstadoJogo desenharComoJogar(void)
     desenharTextoCentralizado("COMO JOGAR", centroX, y, 40, COR_AMBAR);
     y += 70;
 
-    const char *controles[] = {
-        "A / D  ou  <-  / ->      trocar de sala",
-        "E                        pegar o fotograma",
-        "mouse                    mover a lanterna",
+    const char *teclas[] = {
+        "A / D  ou  <- / ->",
+        "E",
+        "mouse",
         "",
         "na cabine, com os 6 fotogramas em mãos:",
-        "1   passar o rolo inteiro, várias vezes",
-        "2   encaixar quadro a quadro",
+        "1",
+        "2",
     };
-    int totalLinhas = (int)(sizeof(controles) / sizeof(controles[0]));
+
+    const char *descricoes[] = {
+        "trocar de sala",
+        "pegar o fotograma",
+        "mover a lanterna",
+        "",
+        "",
+        "passar o rolo inteiro, várias vezes",
+        "encaixar quadro a quadro",
+    };
+
+    int totalLinhas = (int)(sizeof(teclas) / sizeof(teclas[0]));
+
     for (int i = 0; i < totalLinhas; i++) {
-        if (controles[i][0] != '\0') {
-            DrawText(controles[i], 130, y, 20, COR_CREME);
+        if (teclas[i][0] != '\0') {
+            DrawText(teclas[i], 130, y, 20, COR_CREME);
         }
+
+        if (descricoes[i][0] != '\0') {
+            DrawText(descricoes[i], 390, y, 20, COR_CREME);
+        }
+
         y += 28;
     }
 
     y += 20;
     desenharTextoCentralizado("OBJETIVO", centroX, y, 22, COR_AMBAR);
     y += 36;
+
     const char *objetivo[] = {
         "ache os 6 fotogramas espalhados pelo cinema,",
         "leve-os até a cabine de projeção e monte o filme",
-        "sem fazer barulho demais — ela ouve tudo.",
+        "sem fazer barulho demais, ela ouve tudo.",
     };
+
     for (int i = 0; i < 3; i++) {
         desenharTextoCentralizado(objetivo[i], centroX, y, 18, COR_CREME);
         y += 26;
@@ -122,6 +141,7 @@ EstadoJogo desenharComoJogar(void)
     if (apertouConfirmar() || apertouVoltar()) {
         return ESTADO_MENU;
     }
+
     return ESTADO_COMO_JOGAR;
 }
 
@@ -151,7 +171,7 @@ EstadoJogo desenharCreditos(void)
     y += 32;
     desenharTextoCentralizado("imagens e sons de terceiros, licenciados para uso livre", centroX, y, 16, COR_CREME);
     y += 24;
-    desenharTextoCentralizado("(freesound.org e itch.io) — lista completa em docs/assets.md", centroX, y, 16, COR_CREME);
+    desenharTextoCentralizado("(Pixabay) - lista completa em docs/assets.md", centroX, y, 16, COR_CREME);
 
     desenharRodape("ENTER OU ESC PARA VOLTAR", centroX);
 
