@@ -15,11 +15,20 @@ static const char *OPCOES_MENU[TOTAL_OPCOES_MENU] = {
     "JOGAR", "COMO JOGAR", "CRÉDITOS", "SAIR"
 };
 
-/* Desenha um texto centralizado horizontalmente em x, com o topo em y */
+/* Desenha um texto centralizado horizontalmente em x, com o topo em y.
+   Um contorno escuro em volta das letras as destaca do fundo e do efeito VHS */
 static void desenharTextoCentralizado(const char *texto, int centroX, int y, int tamanho, Color cor)
 {
     int largura = MeasureText(texto, tamanho);
-    DrawText(texto, centroX - largura / 2, y, tamanho, cor);
+    int x = centroX - largura / 2;
+    for (int dx = -2; dx <= 2; dx++) {
+        for (int dy = -2; dy <= 2; dy++) {
+            if (dx != 0 || dy != 0) {
+                DrawText(texto, x + dx, y + dy, tamanho, (Color){ 0, 0, 0, 200 });
+            }
+        }
+    }
+    DrawText(texto, x, y, tamanho, cor);
 }
 
 /* Diz se o jogador apertou Enter (teclado principal ou numérico) */
@@ -54,16 +63,18 @@ EstadoJogo desenharMenu(int *opcaoSelecionada)
         *opcaoSelecionada = (*opcaoSelecionada + TOTAL_OPCOES_MENU - 1) % TOTAL_OPCOES_MENU;
     }
 
+    /* Uma sombra atrás das opções, sumindo para a direita, para elas não brigarem com a rua */
+    DrawRectangleGradientH(0, 250, 340, 260, (Color){ 0, 0, 0, 170 }, (Color){ 0, 0, 0, 0 });
     int primeiraLinha = 290;
     int espacamento = 44;
     for (int i = 0; i < TOTAL_OPCOES_MENU; i++) {
         char linha[32];
         if (i == *opcaoSelecionada) {
             snprintf(linha, sizeof(linha), "> %s <", OPCOES_MENU[i]);
-            desenharTextoCentralizado(linha, centroX, primeiraLinha + i * espacamento, 26, COR_AMBAR);
+            desenharTextoCentralizado(linha, centroX, primeiraLinha + i * espacamento, 28, COR_AMBAR);
         } else {
             snprintf(linha, sizeof(linha), "%s", OPCOES_MENU[i]);
-            desenharTextoCentralizado(linha, centroX, primeiraLinha + i * espacamento, 26, COR_CREME);
+            desenharTextoCentralizado(linha, centroX, primeiraLinha + i * espacamento, 28, COR_CREME);
         }
     }
 
@@ -169,9 +180,9 @@ EstadoJogo desenharCreditos(void)
     y += 24;
     desenharTextoCentralizado("ASSETS", centroX, y, 20, COR_AMBAR);
     y += 32;
-    desenharTextoCentralizado("imagens e sons de terceiros, licenciados para uso livre", centroX, y, 16, COR_CREME);
+    desenharTextoCentralizado("imagens geradas por IA (ChatGPT), sons sintetizados e da Pixabay", centroX, y, 16, COR_CREME);
     y += 24;
-    desenharTextoCentralizado("(Pixabay) - lista completa em docs/assets.md", centroX, y, 16, COR_CREME);
+    desenharTextoCentralizado("lista completa em docs/assets.md", centroX, y, 16, COR_CREME);
 
     desenharRodape("ENTER OU ESC PARA VOLTAR", centroX);
 
