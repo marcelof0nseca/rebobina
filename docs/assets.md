@@ -22,9 +22,9 @@ Dois sons vêm da plataforma Pixabay, sob a Pixabay Content License:
 | Arquivo | Nome do áudio | Autor | Origem |
 |---|---|---|---|
 | `batimento.ogg` | Heartbeat Sound | DRAGON-STUDIO | [Pixabay](https://pixabay.com/pt/sound-effects/filme-e-efeitos-especiais-heartbeat-sound-372448/) |
-| `jumpscare.wav` | Eyesaur Jumpscare Sound | sound_effects75 | [Pixabay](https://pixabay.com/sound-effects/horror-eyesaur-jumpscare-sound-482110/) |
+| `jumpscare.wav` | Scary Scream (som nº 401725) | [DRAGON-STUDIO](https://pixabay.com/users/dragon-studio-38165424/) | [Pixabay](https://pixabay.com/sound-effects/) |
 
-O `batimento.ogg` foi convertido de MP3 para OGG; o `jumpscare.wav` foi convertido de MP3 para WAV, com o volume normalizado.
+O `batimento.ogg` foi convertido de MP3 para OGG. O `jumpscare.wav` foi convertido de MP3 para WAV, sem o silêncio do começo e o ruído do fim, com o volume ajustado e um fim suave.
 
 Os outros foram sintetizados pela própria equipe, com um programa em Python que gera as ondas sonoras (sem usar gravações de terceiros):
 
