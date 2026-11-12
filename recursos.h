@@ -22,6 +22,8 @@ typedef struct {
     Sound chiadoTrocaSala;
     Sound estaloOrdenacao;
     Sound jumpscare;
+    Sound menuTroca;          /* tique de botão: a opção do menu mudou */
+    Sound menuConfirmar;      /* tecla PLAY: escolheu uma opção */
 } Recursos;
 
 /* Carrega do disco todas as imagens, a fonte e os sons.

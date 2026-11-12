@@ -82,13 +82,18 @@ int carregarRecursos(Recursos *recursos)
         }
     }
 
-    recursos->somAmbiente = carregarMusica(CAMINHO_SONS "ambiente.ogg", &tudoOk);
+    /* Músicas tocam aos poucos do disco: o ambiente é .qoa (compacto; como música,
+       o .wav deixava 408 bytes sem liberar no raylib) e o batimento, .ogg.
+       Os sons curtos são .wav, carregados inteiros. Origem de cada um: docs/assets.md */
+    recursos->somAmbiente = carregarMusica(CAMINHO_SONS "ambiente.qoa", &tudoOk);
     recursos->batimento = carregarMusica(CAMINHO_SONS "batimento.ogg", &tudoOk);
 
-    recursos->passo = carregarSom(CAMINHO_SONS "passo.ogg", &tudoOk);
-    recursos->chiadoTrocaSala = carregarSom(CAMINHO_SONS "chiado_troca_sala.ogg", &tudoOk);
-    recursos->estaloOrdenacao = carregarSom(CAMINHO_SONS "estalo_ordenacao.ogg", &tudoOk);
-    recursos->jumpscare = carregarSom(CAMINHO_SONS "jumpscare.ogg", &tudoOk);
+    recursos->passo = carregarSom(CAMINHO_SONS "passo.wav", &tudoOk);
+    recursos->chiadoTrocaSala = carregarSom(CAMINHO_SONS "chiado_troca_sala.wav", &tudoOk);
+    recursos->estaloOrdenacao = carregarSom(CAMINHO_SONS "estalo_ordenacao.wav", &tudoOk);
+    recursos->jumpscare = carregarSom(CAMINHO_SONS "jumpscare.wav", &tudoOk);
+    recursos->menuTroca = carregarSom(CAMINHO_SONS "menu_troca.wav", &tudoOk);
+    recursos->menuConfirmar = carregarSom(CAMINHO_SONS "menu_confirmar.wav", &tudoOk);
 
     if (recursos->somAmbiente.stream.buffer != NULL) {
         PlayMusicStream(recursos->somAmbiente);
@@ -133,6 +138,12 @@ void descarregarRecursos(Recursos *recursos)
     }
     if (recursos->jumpscare.stream.buffer != NULL) {
         UnloadSound(recursos->jumpscare);
+    }
+    if (recursos->menuTroca.stream.buffer != NULL) {
+        UnloadSound(recursos->menuTroca);
+    }
+    if (recursos->menuConfirmar.stream.buffer != NULL) {
+        UnloadSound(recursos->menuConfirmar);
     }
 
     CloseAudioDevice();
