@@ -80,20 +80,34 @@ static int coletarFotograma(Partida *partida)
     return 1;
 }
 
+/* Toca um som, se ele foi carregado (sem o arquivo, o jogo segue mudo).
+   Recebe o som. Não retorna nada. */
+static void tocarSom(Sound som)
+{
+    if (som.stream.buffer != NULL) {
+        PlaySound(som);
+    }
+}
+
 /* Atualiza a exploração: andar entre as salas, coletar fotogramas,
    fazer barulho e conferir captura e chegada à Cabine.
-   Recebe a partida, a transição de sala, os comandos do jogador
-   e quantos segundos durou o quadro. Retorna o próximo estado. */
+   Recebe a partida, a transição de sala, os comandos do jogador,
+   quantos segundos durou o quadro e os recursos (para os sons).
+   Retorna o próximo estado. */
 static EstadoJogo atualizarExploracao(Partida *partida, TransicaoFita *transicao,
-                                      ComandosDoJogador comandos, float segundosDoQuadro)
+                                      ComandosDoJogador comandos, float segundosDoQuadro,
+                                      const Recursos *recursos)
 {
     /* Enquanto o reiniciarPartida não monta as salas, não há onde andar */
     if (partida->salaJogador == NULL) {
         return ESTADO_JOGANDO;
     }
 
-    if (comandos.direcao != 0) {
-        iniciarRebobinar(transicao, comandos.direcao);
+    /* Trocar de sala: um passo (cada um num tom um pouco diferente) e a fita rebobinando */
+    if (comandos.direcao != 0 && iniciarRebobinar(transicao, comandos.direcao)) {
+        SetSoundPitch(recursos->passo, 0.9f + (rand() % 21) / 100.0f);
+        tocarSom(recursos->passo);
+        tocarSom(recursos->chiadoTrocaSala);
     }
 
     /* A direção é guardada antes de atualizar: no último quadro da troca,
@@ -124,9 +138,9 @@ static EstadoJogo atualizarExploracao(Partida *partida, TransicaoFita *transicao
 }
 
 /* Executa um passo da ordenação escolhida e faz o barulho correspondente.
-   Recebe a partida.
+   Recebe a partida e os recursos (para o estalo do projetor).
    Retorna o que o passo fez (comparação, troca ou fim). */
-static TipoPasso executarPassoDaOrdenacao(Partida *partida)
+static TipoPasso executarPassoDaOrdenacao(Partida *partida, const Recursos *recursos)
 {
     TipoPasso passo;
     if (partida->ordenacao.algoritmo == ALGORITMO_BUBBLE) {
@@ -135,7 +149,11 @@ static TipoPasso executarPassoDaOrdenacao(Partida *partida)
         passo = passoInsertionSort(partida->fotogramasColetados, &partida->ordenacao);
     }
 
-    /* Cada comparação e cada troca fazem barulho: é aqui que o algoritmo vira risco */
+    /* Cada comparação e cada troca fazem barulho: é aqui que o algoritmo vira risco.
+       O projetor estala a cada passo, para o jogador ouvir o barulho que está fazendo */
+    if (passo != PASSO_FIM) {
+        tocarSom(recursos->estaloOrdenacao);
+    }
     if (passo == PASSO_COMPARACAO) {
         atualizarRuido(partida, RUIDO_COMPARAR, LIMITE_RUIDO_MONTAGEM);
     } else if (passo == PASSO_TROCA) {
@@ -148,11 +166,11 @@ static TipoPasso executarPassoDaOrdenacao(Partida *partida)
 /* Atualiza a montagem do filme: espera o jogador escolher o algoritmo
    e depois executa um passo da ordenação a cada INTERVALO_PASSO segundos.
    Recebe a partida, os comandos do jogador, quantos segundos durou o quadro,
-   quanto falta para o próximo passo e a animação (os dois atualizados aqui).
-   Retorna o próximo estado. */
+   quanto falta para o próximo passo e a animação (os dois atualizados aqui)
+   e os recursos (para os sons). Retorna o próximo estado. */
 static EstadoJogo atualizarMontagem(Partida *partida, ComandosDoJogador comandos,
                                     float segundosDoQuadro, float *esperaProximoPasso,
-                                    AnimacaoOrdenacao *animacao)
+                                    AnimacaoOrdenacao *animacao, const Recursos *recursos)
 {
     if (partida->ordenacao.algoritmo == ALGORITMO_NENHUM) {
         if (comandos.algoritmoEscolhido != ALGORITMO_NENHUM) {
@@ -171,7 +189,7 @@ static EstadoJogo atualizarMontagem(Partida *partida, ComandosDoJogador comandos
     }
     *esperaProximoPasso = INTERVALO_PASSO;
 
-    TipoPasso passo = executarPassoDaOrdenacao(partida);
+    TipoPasso passo = executarPassoDaOrdenacao(partida, recursos);
 
     /* A animação mostra este passo até o próximo */
     animacao->houvePasso = true;
@@ -263,16 +281,11 @@ static void mudarDeEstado(Partida *partida, EstadoJogo proximoEstado, TransicaoF
    Recebe a partida, o estado devolvido, a transição de sala e o relógio
    da captura (-1 = sem captura), que começa aqui. Não retorna nada. */
 static void seguirDepoisDaPartida(Partida *partida, EstadoJogo proximoEstado,
-                                  TransicaoFita *transicao, float *segundosDesdeCaptura,
-                                  Recursos *recursos)
+                                  TransicaoFita *transicao, float *segundosDesdeCaptura)
 {
     if (proximoEstado == ESTADO_DERROTA) {
-        if (recursos->jumpscare.stream.buffer != NULL) {
-            PlaySound(recursos->jumpscare);
-        }
-
         *segundosDesdeCaptura = 0;
-        *transicao = (TransicaoFita){ 0 };
+        *transicao = (TransicaoFita){ 0 };   /* a fita para de rebobinar: agora é a criatura */
         return;
     }
     mudarDeEstado(partida, proximoEstado, transicao);
@@ -366,9 +379,17 @@ static EstadoJogo desenharQuadro(Partida *partida, int *opcaoMenu, Efeitos *efei
     }
     EndTextureMode();
 
-    /* Etapa 3: o filtro VHS */
+    /* Etapa 3: o filtro VHS. Nas telas do menu ele é mais suave, para o texto
+       ficar legível; entrando no cinema, volta aos poucos ao normal */
+    float suavidade = 0;
+    if (!estaEmPartida(partida->estadoAtual)) {
+        suavidade = 1.0f;
+        if (segundosDaEntrada >= 0) {
+            suavidade = 1.0f - fminf(segundosDaEntrada / DURACAO_ENTRADA, 1.0f);
+        }
+    }
     BeginTextureMode(efeitos->tela);
-    aplicarEfeitoVHS(efeitos, tempo, sinais.interferenciaFita, transicao);
+    aplicarEfeitoVHS(efeitos, tempo, sinais.interferenciaFita, suavidade, transicao);
     EndTextureMode();
 
     /* Janela: a tela virtual ampliada */
@@ -431,21 +452,25 @@ int main(void)
                 mudarDeEstado(&partida, ESTADO_JOGANDO, &transicao);
             }
         } else if (segundosDesdeCaptura >= 0) {
+            /* O grito sai quando a criatura salta, e chega ao máximo com o rosto na tela */
+            bool antesDoPulo = segundosDesdeCaptura < INICIO_DO_PULO_NA_CAPTURA;
             segundosDesdeCaptura += segundosDoQuadro;
+            if (antesDoPulo && segundosDesdeCaptura >= INICIO_DO_PULO_NA_CAPTURA) {
+                tocarSom(recursos.jumpscare);
+            }
             if (segundosDesdeCaptura >= DURACAO_CAPTURA) {
                 segundosDesdeCaptura = -1;
                 mudarDeEstado(&partida, ESTADO_DERROTA, &transicao);
             }
         } else if (partida.estadoAtual == ESTADO_JOGANDO) {
-            EstadoJogo depoisDaExploracao = atualizarExploracao(&partida, &transicao,
-                                                                lerComandos(), segundosDoQuadro);
-            seguirDepoisDaPartida(&partida, depoisDaExploracao, &transicao,
-                      &segundosDesdeCaptura, &recursos);
+            EstadoJogo depoisDaExploracao = atualizarExploracao(&partida, &transicao, lerComandos(),
+                                                                segundosDoQuadro, &recursos);
+            seguirDepoisDaPartida(&partida, depoisDaExploracao, &transicao, &segundosDesdeCaptura);
         } else if (partida.estadoAtual == ESTADO_MONTAGEM) {
             EstadoJogo depoisDaMontagem = atualizarMontagem(&partida, lerComandos(), segundosDoQuadro,
-                                                            &esperaProximoPasso, &animacaoOrdenacao);
-            seguirDepoisDaPartida(&partida, depoisDaMontagem, &transicao,
-                      &segundosDesdeCaptura, &recursos);
+                                                            &esperaProximoPasso, &animacaoOrdenacao,
+                                                            &recursos);
+            seguirDepoisDaPartida(&partida, depoisDaMontagem, &transicao, &segundosDesdeCaptura);
         }
 
         /* A distância vem da lista circular. Fora da partida ela é -1
@@ -472,10 +497,22 @@ int main(void)
         /* A câmera olha para onde a lanterna aponta e treme com a criatura perto */
         Vista vista = calcularVista(olharDaLanterna(&lanterna), tempo, sinais.tremorCamera);
 
+        /* Guardados para saber se o menu trocou de opção ou de tela neste quadro */
+        int opcaoAntes = opcaoMenu;
+        EstadoJogo estadoAntes = partida.estadoAtual;
+
         EstadoJogo proximoEstado = desenharQuadro(&partida, &opcaoMenu, &efeitos, &recursos,
                                                   &lanterna, vista, tempo, sinais, &transicao,
                                                   &animacaoOrdenacao, modoApresentacao,
                                                   segundosDesdeCaptura, segundosDaEntrada);
+        /* Sons do menu: um tique ao trocar de opção e a tecla PLAY ao escolher */
+        if (opcaoMenu != opcaoAntes) {
+            tocarSom(recursos.menuTroca);
+        }
+        if (!estaEmPartida(estadoAntes) && proximoEstado != estadoAntes) {
+            tocarSom(recursos.menuConfirmar);
+        }
+
         if (partida.estadoAtual == ESTADO_MENU && proximoEstado == ESTADO_JOGANDO) {
             /* Escolheu Jogar: primeiro a câmera entra pela porta do cinema */
             segundosDaEntrada = 0;

@@ -20,6 +20,7 @@
 #define QUADROS_DA_CAPTURA 3
 #define DURACAO_CAPTURA 1.6f               /* segundos, do bote até a tela de derrota */
 #define INICIO_DA_CRIATURA_NA_CAPTURA 0.25f /* antes disso, só a fita falhando sobre a sala */
+#define INICIO_DO_PULO_NA_CAPTURA 0.60f     /* a criatura salta: é quando sai o grito */
 
 /* Entrada no cinema: ao escolher Jogar, a câmera avança pela porta da fachada */
 #define DURACAO_ENTRADA 1.5f               /* segundos, do menu até o Saguão */
@@ -83,6 +84,7 @@ typedef struct {
     int localTremor;
     int localRebobinar;
     int localTempoRebobinando;
+    int localSuavidade;
 
     GraoDePoeira poeira[QUANTIDADE_POEIRA];
 
@@ -159,9 +161,11 @@ int fitaEstaTrocando(const TransicaoFita *transicao);
 /* Aplica o filtro VHS na folha quadro: ondulação, rasgos, cores separadas,
    brilho difuso, scanlines, granulado, vinheta e a fita rebobinando.
    Deve ser chamada dentro de BeginTextureMode(efeitos->tela).
-   Recebe os efeitos, o tempo de jogo, o tremor (0 = calmo, 1 = máximo)
-   e a transição de sala. Não retorna nada. */
-void aplicarEfeitoVHS(Efeitos *efeitos, float tempo, float tremor, const TransicaoFita *transicao);
+   Recebe os efeitos, o tempo de jogo, o tremor (0 = calmo, 1 = máximo),
+   a suavidade (0 = fita normal, 1 = menos brilho e menos cores separadas,
+   para o texto do menu ficar legível) e a transição de sala. Não retorna nada. */
+void aplicarEfeitoVHS(Efeitos *efeitos, float tempo, float tremor, float suavidade,
+                      const TransicaoFita *transicao);
 
 /* Traduz a distância da criatura em sinais: quanto mais perto, mais forte.
    Recebe a distância em salas (da distanciaCircular; -1 se desconhecida).
