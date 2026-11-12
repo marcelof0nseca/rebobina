@@ -17,18 +17,25 @@ As imagens utilizadas no jogo foram geradas com auxílio de inteligência artifi
 
 ## 2. Efeitos sonoros
 
-Os efeitos sonoros foram obtidos na plataforma Pixabay, sob a Pixabay Content License.
+Dois sons vêm da plataforma Pixabay, sob a Pixabay Content License:
 
 | Arquivo | Nome do áudio | Autor | Origem |
 |---|---|---|---|
-| `ambiente.ogg` | Horror and Suspense Ambient Background Loop | Fronbondi_Skegs | [Pixabay](https://pixabay.com/sound-effects/horror-drone-horror-and-suspense-ambient-background-loop-339888/) |
 | `batimento.ogg` | Heartbeat Sound | DRAGON-STUDIO | [Pixabay](https://pixabay.com/pt/sound-effects/filme-e-efeitos-especiais-heartbeat-sound-372448/) |
-| `passo.ogg` | Footsteps in Empty Room | OxidVideos | [Pixabay](https://pixabay.com/sound-effects/film-special-effects-footsteps-in-empty-room-356922/) |
-| `chiado_troca_sala.ogg` | VHS Tape Clicks Rewind Play Mechanical | TRP (Freesound) | [Pixabay](https://pixabay.com/sound-effects/film-special-effects-vhs-tape-clicks-rewind-play-mechanical-05-54159/) |
-| `estalo_ordenacao.ogg` | Projector Button Push | GreekIrish (Freesound) | [Pixabay](https://pixabay.com/sound-effects/technology-projector-button-push-6258/) |
-| `jumpscare.ogg` | Sudden Screaming Sound | Alex_Jauk | [Pixabay](https://pixabay.com/sound-effects/horror-sudden-screaming-sound-193070/) |
+| `jumpscare.wav` | Eyesaur Jumpscare Sound | sound_effects75 | [Pixabay](https://pixabay.com/sound-effects/horror-eyesaur-jumpscare-sound-482110/) |
 
-Os arquivos foram convertidos do formato MP3 para OGG para utilização no jogo.
+O `batimento.ogg` foi convertido de MP3 para OGG; o `jumpscare.wav` foi convertido de MP3 para WAV, com o volume normalizado.
+
+Os outros foram sintetizados pela própria equipe, com um programa em Python que gera as ondas sonoras (sem usar gravações de terceiros):
+
+| Arquivo | O que é |
+|---|---|
+| `ambiente.qoa` | Drone grave e dissonante, vento no prédio e rangidos distantes, em loop (formato QOA, que o raylib lê) |
+| `passo.wav` | Passo no piso de madeira velha |
+| `chiado_troca_sala.wav` | A fita rebobinando na troca de sala |
+| `estalo_ordenacao.wav` | O mecanismo do projetor a cada passo da ordenação |
+| `menu_troca.wav` | Tique de botão de videocassete ao trocar de opção no menu |
+| `menu_confirmar.wav` | Tecla PLAY ao escolher uma opção no menu |
 
 **Pasta:** `assets/sons/`
 

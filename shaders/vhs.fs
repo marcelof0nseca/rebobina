@@ -19,6 +19,7 @@ uniform float tempo;          // segundos desde o início
 uniform float tremor;         // 0 = calmo, 1 = criatura por perto
 uniform float rebobinar;      // 0 = tocando normal, 1 = auge da troca de sala
 uniform float tempoRebobinando; // segundos desde o começo da troca de sala
+uniform float suavidade;      // 0 = fita normal, 1 = menu: menos brilho e menos cores separadas
 
 out vec4 finalColor;
 
@@ -84,14 +85,14 @@ void main()
     }
 
     // 5. Aberração cromática: vermelho e azul levemente deslocados.
-    float desvio = 0.0016 + tremor * 0.0012 + rebobinar * 0.004;
+    float desvio = 0.0016 - suavidade * 0.0008 + tremor * 0.0012 + rebobinar * 0.004;
     float vermelho = texture(texture0, uv + vec2(desvio, 0.0)).r;
     float verde = texture(texture0, uv).g;
     float azul = texture(texture0, uv - vec2(desvio, 0.0)).b;
     vec3 cor = vec3(vermelho, verde, azul);
 
     // 6. Brilho difuso nas luzes fortes.
-    cor += brilhoDifuso(uv) * 0.9;
+    cor += brilhoDifuso(uv) * (0.9 - suavidade * 0.5);
 
     // 7. Linhas de varredura (scanlines).
     float varredura = 0.82 + 0.18 * sin(uv.y * resolucao.y * 3.14159);

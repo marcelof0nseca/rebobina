@@ -53,7 +53,7 @@
    O zoom cresce a partir dos olhos (em pixels da imagem de 960 x 540),
    para o olhar da criatura ficar parado enquanto ela se aproxima */
 static const float INICIO_DOS_QUADROS[QUADROS_DA_CAPTURA + 1] = {
-    INICIO_DA_CRIATURA_NA_CAPTURA, 0.60f, 0.90f, 1.40f
+    INICIO_DA_CRIATURA_NA_CAPTURA, INICIO_DO_PULO_NA_CAPTURA, 0.90f, 1.40f
 };
 static const Vector2 OLHOS_NA_CAPTURA[QUADROS_DA_CAPTURA] = { { 467, 137 }, { 430, 150 }, { 428, 69 } };
 static const float ZOOM_NO_COMECO[QUADROS_DA_CAPTURA] = { 1.00f, 1.00f, 1.05f };
@@ -191,6 +191,7 @@ Efeitos carregarEfeitos(void)
     efeitos.localTremor = GetShaderLocation(efeitos.vhs, "tremor");
     efeitos.localRebobinar = GetShaderLocation(efeitos.vhs, "rebobinar");
     efeitos.localTempoRebobinando = GetShaderLocation(efeitos.vhs, "tempoRebobinando");
+    efeitos.localSuavidade = GetShaderLocation(efeitos.vhs, "suavidade");
     SetShaderValue(efeitos.vhs, GetShaderLocation(efeitos.vhs, "resolucao"),
                    &resolucao, SHADER_UNIFORM_VEC2);
 
@@ -438,9 +439,11 @@ int fitaEstaTrocando(const TransicaoFita *transicao)
 /* Aplica o filtro VHS na folha quadro: ondulação, rasgos, cores separadas,
    brilho difuso, scanlines, granulado, vinheta e a fita rebobinando.
    Deve ser chamada dentro de BeginTextureMode(efeitos->tela).
-   Recebe os efeitos, o tempo de jogo, o tremor (0 = calmo, 1 = máximo)
-   e a transição de sala. Não retorna nada. */
-void aplicarEfeitoVHS(Efeitos *efeitos, float tempo, float tremor, const TransicaoFita *transicao)
+   Recebe os efeitos, o tempo de jogo, o tremor (0 = calmo, 1 = máximo),
+   a suavidade (0 = fita normal, 1 = menos brilho e menos cores separadas,
+   para o texto do menu ficar legível) e a transição de sala. Não retorna nada. */
+void aplicarEfeitoVHS(Efeitos *efeitos, float tempo, float tremor, float suavidade,
+                      const TransicaoFita *transicao)
 {
     /* Força do rebobinar: sobe de 0 a 1 até a metade da troca e volta a 0 */
     float rebobinar = 0.0f;
@@ -454,6 +457,7 @@ void aplicarEfeitoVHS(Efeitos *efeitos, float tempo, float tremor, const Transic
     SetShaderValue(efeitos->vhs, efeitos->localTremor, &tremor, SHADER_UNIFORM_FLOAT);
     SetShaderValue(efeitos->vhs, efeitos->localRebobinar, &rebobinar, SHADER_UNIFORM_FLOAT);
     SetShaderValue(efeitos->vhs, efeitos->localTempoRebobinando, &tempoRebobinando, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(efeitos->vhs, efeitos->localSuavidade, &suavidade, SHADER_UNIFORM_FLOAT);
 
     BeginShaderMode(efeitos->vhs);
     desenharFolha(efeitos->quadro);
